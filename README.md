@@ -30,7 +30,7 @@ import net.blueva.api.BlueAPI;
 
 ## API structure
 
-`BlueAPI` is a small facade. Implementations live in dedicated packages, while the public aliases keep usage centralized under `BlueAPI.*`.
+`BlueAPI` is a small facade. Implementations live in dedicated packages, while public aliases keep usage centralized under `BlueAPI.*`. Event wrappers are also split into dedicated interfaces/adapters internally.
 
 ```java
 BlueAPI.Dependencies
@@ -133,11 +133,13 @@ public final class PickupListener implements BlueAPI.Events.EntityPickup {
 Register wrapped listeners from your plugin:
 
 ```java
-boolean registered = BlueAPI.Events.register(
-        this,
-        new PickupListener(),
-        EventPriority.NORMAL
-);
+if (BlueAPI.Events.supports(BlueAPI.Events.Type.ENTITY_PICKUP)) {
+    BlueAPI.Events.register(
+            this,
+            new PickupListener(),
+            EventPriority.NORMAL
+    );
+}
 ```
 
 Current wrapped events:
@@ -154,7 +156,7 @@ Current wrapped events:
 - `BlueAPI.Events.EntityAirChange`
   - Available on servers with `EntityAirChangeEvent`.
 
-Unsupported wrapped events simply return `false` from `BlueAPI.Events.register(...)`.
+Use `BlueAPI.Events.supports(BlueAPI.Events.Type...)` to check capabilities before registering. Unsupported wrapped events also return `false` from `BlueAPI.Events.register(...)`.
 
 ## Dependency API
 
