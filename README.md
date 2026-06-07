@@ -1,32 +1,79 @@
-# BlueAPI - Plugin Library for Blueva and Other Developers
+# BlueAPI
+
 [![](https://jitpack.io/v/BluevaDevelopment/BlueAPI.svg)](https://jitpack.io/#BluevaDevelopment/BlueAPI)
 
-Welcome to BlueAPI, the ultimate tool for powering up your plugins in the Minecraft universe! This library has been specifically designed to work with plugins developed by Blueva and other developers, providing a wide range of features and tools that will ease the creation and enhancement of your projects.
+BlueAPI is a lightweight API foundation for Minecraft plugins. It focuses on keeping reusable plugin infrastructure small, explicit, and easy to access from a single namespace:
 
-## Current Features
+```java
+import net.blueva.api.BlueAPI;
+```
 
-- **Included Libraries**: BlueAPI already comes with the following integrated libraries, ready to use in your plugins:
-    - **bStats**: Easy integration for plugin statistics and valuable data collection.
-    - **FastBoard**: Quickly create and update scoreboards to display crucial information.
-    - **IridiumColorAPI**: Add style and color to your messages and text in-game.
-    - **Update Checker**: Keep your users informed about updates and news.
+## Installation with JitPack
 
-- **Multiple Configuration File Manager**: BlueAPI simplifies configuration management, allowing you to handle multiple configuration files efficiently and in an organized manner.
+```xml
+<repositories>
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+</repositories>
 
-## Upcoming Updates
+<dependencies>
+    <dependency>
+        <groupId>com.github.BluevaDevelopment</groupId>
+        <artifactId>BlueAPI</artifactId>
+        <version>VERSION</version>
+    </dependency>
+</dependencies>
+```
 
-We are excited about the enhancements coming in the upcoming versions of BlueAPI. Our team is hard at work to deliver the following features:
+## Runtime dependencies
 
-- **Multilanguage System**: Make your plugins accessible to a wider audience by implementing multiple languages.
-- **Advanced Message Manager**: You'll now have full control over message presentation in different areas of the game, including chat, action bar, titles, and boss bars.
-- **Multiple Scoreboard Manager**: Visualize and update multiple scoreboards easily and with customization options.
-- **Material Name Translator**: Say goodbye to complications when switching between different Minecraft versions; BlueAPI will provide you with an integrated solution for translating material names.
-- **Region Manager**: Define and manage 2D and 3D regions effortlessly, allowing for a richer and more dynamic gaming experience.
+Runtime dependency loading is managed through `BlueAPI.Dependencies`.
 
-And much more to discover! Our commitment is to continue adding powerful and useful features to make your development experience even more enjoyable and productive.
+It downloads Maven artifacts into the plugin's `libraries` folder and injects them into the plugin classloader at startup.
 
-## Contributions
+```java
+public final class MyPlugin extends JavaPlugin {
 
-If you wish to contribute to the development of BlueAPI, we are open to your ideas and suggestions! Feel free to create issues on GitHub or submit pull requests to collaborate on the project and make BlueAPI even better.
+    @Override
+    public void onEnable() {
+        BlueAPI.Dependencies.load(this, BlueAPI.Dependencies.list(
+                BlueAPI.Dependencies.mavenCentral("dev.dejvokep", "boosted-yaml", "1.3.7"),
+                BlueAPI.Dependencies.jitPack("com.github.MrMicky-FR", "FastBoard", "2.1.5")
+        ));
+    }
+}
+```
 
-We appreciate your support and hope that BlueAPI provides you with the tools you need to create amazing and exciting plugins in the Minecraft world. Join us in this thrilling development journey!
+You can also create dependency descriptors directly:
+
+```java
+BlueAPI.Dependencies.RuntimeDependency dependency = new BlueAPI.Dependencies.RuntimeDependency(
+        "dev.dejvokep",
+        "boosted-yaml",
+        "1.3.7",
+        BlueAPI.Dependencies.Repositories.MAVEN_CENTRAL
+);
+
+BlueAPI.Dependencies.loader(this).load(dependency);
+```
+
+## Dependency API
+
+- `BlueAPI.Dependencies`: runtime dependency manager.
+- `BlueAPI.Dependencies.Loader`: downloads and injects runtime dependencies.
+- `BlueAPI.Dependencies.RuntimeDependency`: Maven dependency descriptor.
+- `BlueAPI.Dependencies.Repositories`: common Maven repository URLs.
+
+Included repositories:
+
+```java
+BlueAPI.Dependencies.Repositories.MAVEN_CENTRAL
+BlueAPI.Dependencies.Repositories.CODEMC
+BlueAPI.Dependencies.Repositories.JITPACK
+```
+
+## Goal
+
+BlueAPI aims to be a common foundation for Blueva plugins: small, clear, and ready to grow with multiversion tools and reusable systems for Bukkit/Spigot/Paper development.
