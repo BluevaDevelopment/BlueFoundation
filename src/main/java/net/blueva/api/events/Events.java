@@ -14,7 +14,9 @@ public class Events {
         PLAYER_SWAP_HAND_ITEMS,
         PLAYER_ITEM_MEND,
         ENTITY_TOGGLE_GLIDE,
-        ENTITY_AIR_CHANGE
+        ENTITY_AIR_CHANGE,
+        PLAYER_INTERACT_AT_ENTITY,
+        PLAYER_ARMOR_STAND_MANIPULATE
     }
 
     public static EventManager manager() {
@@ -46,5 +48,11 @@ public class Events {
     }
 
     public interface EntityAirChange extends net.blueva.api.events.wrapped.EntityAirChange {
+    }
+
+    public interface PlayerInteractAtEntity extends net.blueva.api.events.wrapped.PlayerInteractAtEntity {
+    }
+
+    public interface PlayerArmorStandManipulate extends net.blueva.api.events.wrapped.PlayerArmorStandManipulate {
     }
 }

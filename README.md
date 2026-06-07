@@ -155,6 +155,10 @@ Current wrapped events:
   - Available on servers with `EntityToggleGlideEvent`.
 - `BlueAPI.Events.EntityAirChange`
   - Available on servers with `EntityAirChangeEvent`.
+- `BlueAPI.Events.PlayerInteractAtEntity`
+  - Available on servers with `PlayerInteractAtEntityEvent`. Provides `handName` when available.
+- `BlueAPI.Events.PlayerArmorStandManipulate`
+  - Available on servers with `PlayerArmorStandManipulateEvent`. Provides `slotName` and `handName` when available.
 
 Use `BlueAPI.Events.supports(BlueAPI.Events.Type...)` to check capabilities before registering. Unsupported wrapped events also return `false` from `BlueAPI.Events.register(...)`.
 
