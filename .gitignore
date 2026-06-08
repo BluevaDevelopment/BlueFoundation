@@ -36,3 +36,8 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+# Local tests
+/src/test/
+/tools/validate-multiversion-events.py
+

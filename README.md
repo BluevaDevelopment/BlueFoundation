@@ -37,8 +37,12 @@ BlueAPI.Dependencies
 BlueAPI.Version
 BlueAPI.Reflection
 BlueAPI.Materials
+BlueAPI.Items
 BlueAPI.Sounds
+BlueAPI.Scheduler
+BlueAPI.Commands
 BlueAPI.Messages
+BlueAPI.Text
 BlueAPI.Events
 ```
 
@@ -67,6 +71,40 @@ BlueAPI.Dependencies.RuntimeDependency dependency = new BlueAPI.Dependencies.Run
 
 BlueAPI.Dependencies.loader(this).load(dependency);
 ```
+
+### Adventure runtime
+
+BlueAPI and Blueva plugins use Adventure + MiniMessage for text, not `ChatColor`.
+
+Rules:
+
+- Author user-facing text as MiniMessage.
+- Use Adventure `Component` internally for text-aware APIs.
+- Serialize to legacy strings only at Bukkit boundaries that still require strings.
+- Keep legacy `&` color support only as compatibility input.
+
+Call the Adventure runtime profile before using `BlueAPI.Text` or `BlueAPI.Messages` on servers that may not provide Adventure natively:
+
+```java
+@Override
+public void onLoad() {
+    BlueAPI.Dependencies.loadAdventure(this);
+}
+
+@Override
+public void onEnable() {
+    BlueAPI.Messages.init(this);
+}
+
+@Override
+public void onDisable() {
+    BlueAPI.Messages.close();
+}
+```
+
+Paper servers with native Adventure audiences do not need `adventure-platform-bukkit`; Spigot/Bukkit servers get the required Adventure libraries through the runtime dependency loader.
+
+The Bukkit Adventure platform targets Paper, Spigot, and Bukkit across old and modern Minecraft versions. BlueAPI still compiles against Java 8 / Spigot API 1.8.8, so it compiles against the latest Java-8-compatible Adventure 4.x line. Runtime loading is not hard-capped to that line: modern Java 21 + Minecraft 1.21+ Spigot/Bukkit profiles can inject Adventure 5.x core artifacts while the Bukkit platform bridge stays on its own 4.x line.
 
 ## Version utilities
 
@@ -106,20 +144,138 @@ Sound levelUp = BlueAPI.Sounds.require("ENTITY_PLAYER_LEVELUP", "LEVEL_UP");
 BlueAPI.Sounds.play(player, 1.0F, 1.0F, "ENTITY_PLAYER_LEVELUP", "LEVEL_UP");
 ```
 
-## Messages
+## Items
 
-`BlueAPI.Messages` provides basic multi-version player messaging helpers.
+`BlueAPI.Items` creates and edits Bukkit `ItemStack` instances. Display names and lore are MiniMessage-first, then serialized to legacy strings only because older Bukkit item metadata APIs require strings.
 
 ```java
-BlueAPI.Messages.send(player, "&aHello!");
-BlueAPI.Messages.actionBar(player, "&eAction bar text");
-BlueAPI.Messages.title(player, "&bTitle", "&7Subtitle", 10, 70, 20);
+ItemStack item = BlueAPI.Items.builder("OAK_SIGN", "SIGN")
+        .amount(1)
+        .name("<gold>Game Selector</gold>")
+        .lore("<gray>Right click to open")
+        .glow()
+        .hideAllFlags()
+        .build();
+```
+
+Useful helpers:
+
+```java
+BlueAPI.Items.name(item, "<green>Ready");
+BlueAPI.Items.lore(item, "<gray>Line one", "<yellow>Line two");
+BlueAPI.Items.enchant(item, "sharpness", 1);
+BlueAPI.Items.unbreakable(item, true);
+```
+
+## Text and messages
+
+`BlueAPI.Text` parses MiniMessage into Adventure `Component` values and serializes components back to legacy strings only for old Bukkit APIs that still require strings.
+
+```java
+Component title = BlueAPI.Text.component("<gold>Victory!</gold>");
+String inventoryTitle = BlueAPI.Text.legacySection(title);
+```
+
+`BlueAPI.Messages` sends Adventure components to players, command senders, action bars, and titles. Message strings are parsed as MiniMessage by default. Legacy `&` colors are accepted only as a compatibility input path.
+
+```java
+BlueAPI.Messages.send(player, "<green>Hello!");
+BlueAPI.Messages.actionBar(player, "<yellow>Action bar text");
+BlueAPI.Messages.title(player, "<aqua>Title", "<gray>Subtitle", 10, 70, 20);
+```
+
+## Scheduler
+
+`BlueAPI.Scheduler` is a Folia-aware scheduler facade with small stable task handles and tick conversion helpers. It compiles against legacy Spigot, then detects Folia at runtime and uses Paper/Folia schedulers reflectively, so consumers do not need to bundle any external scheduler library.
+
+Global/server work:
+
+```java
+BlueAPI.Scheduler.Task task = BlueAPI.Scheduler.runLater(
+        this,
+        () -> BlueAPI.Messages.send(player, "<green>Ready!"),
+        BlueAPI.Scheduler.seconds(3)
+);
+
+BlueAPI.Scheduler.runAsync(this, () -> {
+    // Async work
+});
+
+task.cancel();
+```
+
+Region/entity-safe Folia work:
+
+```java
+BlueAPI.Scheduler.runAtLocation(this, location, task -> {
+    // Safe for blocks/chunks at this location on Folia.
+});
+
+BlueAPI.Scheduler.runAtEntityTimer(
+        this,
+        player,
+        task -> player.setVelocity(vector),
+        () -> getLogger().warning("Entity scheduler retired"),
+        1L,
+        1L
+);
+
+BlueAPI.Scheduler.teleportAsync(player, destination).thenAccept(success -> {
+    if (success) {
+        BlueAPI.Scheduler.runAtEntity(this, player, task -> BlueAPI.Messages.send(player, "<green>Teleported!"));
+    }
+});
+```
+
+Supported helpers:
+
+```java
+BlueAPI.Scheduler.runNextTick(plugin, task);
+BlueAPI.Scheduler.runLater(plugin, task, delayTicks);
+BlueAPI.Scheduler.runTimer(plugin, task, delayTicks, periodTicks);
+BlueAPI.Scheduler.runAsync(plugin, task);
+BlueAPI.Scheduler.runLaterAsync(plugin, task, delayTicks);
+BlueAPI.Scheduler.runTimerAsync(plugin, task, delayTicks, periodTicks);
+BlueAPI.Scheduler.runAtLocation(plugin, location, task);
+BlueAPI.Scheduler.runAtLocationLater(plugin, location, task, delayTicks);
+BlueAPI.Scheduler.runAtLocationTimer(plugin, location, task, delayTicks, periodTicks);
+BlueAPI.Scheduler.runAtEntity(plugin, entity, task);
+BlueAPI.Scheduler.runAtEntityWithFallback(plugin, entity, task, fallback);
+BlueAPI.Scheduler.runAtEntityLater(plugin, entity, task, fallback, delayTicks);
+BlueAPI.Scheduler.runAtEntityTimer(plugin, entity, task, fallback, delayTicks, periodTicks);
+BlueAPI.Scheduler.isFolia();
+BlueAPI.Scheduler.isOwnedByCurrentRegion(entityOrLocation);
+BlueAPI.Scheduler.teleportAsync(entity, location);
+BlueAPI.Scheduler.cancelTasks(plugin);
+```
+
+The old `sync*`/`async*` methods remain as aliases for Bukkit-style code. On Folia, global methods run through the global region scheduler; use the location/entity methods for world, block and entity mutations.
+
+## Commands
+
+`BlueAPI.Commands` registers command handlers declared in `plugin.yml` and provides small sender/tab-completion helpers.
+
+```java
+BlueAPI.Commands.register(
+        this,
+        "arena",
+        (sender, command, label, args) -> {
+            if (!BlueAPI.Commands.hasPermission(sender, "blueva.arena", "<red>No permission.")) {
+                return true;
+            }
+            BlueAPI.Messages.send(sender, "<green>Arena command executed.");
+            return true;
+        },
+        (sender, command, label, args) -> BlueAPI.Commands.suggest(
+                BlueAPI.Commands.arg(args, 0),
+                Arrays.asList("create", "delete", "edit")
+        )
+);
 ```
 
 ## Multi-version events
 
 `BlueAPI.Events` provides wrapped events that register the correct Bukkit event implementation at runtime.
-
 ```java
 public final class PickupListener implements BlueAPI.Events.EntityPickup {
 
