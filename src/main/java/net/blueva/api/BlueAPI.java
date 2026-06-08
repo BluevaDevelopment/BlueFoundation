@@ -32,13 +32,33 @@ public final class BlueAPI {
         }
     }
 
+    public static class Items extends net.blueva.api.items.Items {
+        private Items() {
+        }
+    }
+
     public static class Sounds extends net.blueva.api.sounds.Sounds {
         private Sounds() {
         }
     }
 
+    public static class Scheduler extends net.blueva.api.scheduler.Scheduler {
+        private Scheduler() {
+        }
+    }
+
+    public static class Commands extends net.blueva.api.commands.Commands {
+        private Commands() {
+        }
+    }
+
     public static class Messages extends net.blueva.api.messages.Messages {
         private Messages() {
+        }
+    }
+
+    public static class Text extends net.blueva.api.text.Text {
+        private Text() {
         }
     }
 
