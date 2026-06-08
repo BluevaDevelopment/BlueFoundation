@@ -42,6 +42,62 @@ public class Dependencies {
         loader(plugin).load(dependency);
     }
 
+    /**
+     * Loads the Adventure stack required by BlueAPI text/message utilities.
+     *
+     * <p>Paper versions that expose native Adventure audiences do not need
+     * {@code adventure-platform-bukkit}. Spigot/Bukkit servers do, so this
+     * profile only injects the pieces missing from the current classpath.</p>
+     */
+    public static void loadAdventure(JavaPlugin plugin) {
+        load(plugin, adventureDependencies());
+    }
+
+    /**
+     * @return runtime dependencies required before using {@code BlueAPI.Text}
+     * or {@code BlueAPI.Messages} on servers that do not already provide them.
+     */
+    public static List<RuntimeDependency> adventureDependencies() {
+        List<RuntimeDependency> dependencies = new ArrayList<>();
+        String adventureVersion = adventureCoreRuntimeVersion();
+
+        if (!classExists("net.kyori.adventure.audience.Audience")) {
+            dependencies.add(mavenCentral("net.kyori", "adventure-api", adventureVersion));
+            dependencies.add(mavenCentral("net.kyori", "adventure-key", adventureVersion));
+            dependencies.add(mavenCentral("net.kyori", "examination-api", Versions.EXAMINATION));
+            dependencies.add(mavenCentral("net.kyori", "examination-string", Versions.EXAMINATION));
+        }
+
+        if (!classExists("net.kyori.adventure.text.minimessage.MiniMessage")) {
+            dependencies.add(mavenCentral("net.kyori", "adventure-text-minimessage", adventureVersion));
+        }
+
+        if (!classExists("net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer")) {
+            dependencies.add(mavenCentral("net.kyori", "adventure-text-serializer-legacy", adventureVersion));
+        }
+
+        if (!classExists("net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer")) {
+            dependencies.add(mavenCentral("net.kyori", "adventure-text-serializer-plain", adventureVersion));
+        }
+
+        if (!nativeAdventureAudienceAvailable()) {
+            dependencies.add(mavenCentral("net.kyori", "adventure-platform-api", Versions.ADVENTURE_PLATFORM));
+            dependencies.add(mavenCentral("net.kyori", "adventure-platform-bukkit", Versions.ADVENTURE_PLATFORM));
+            dependencies.add(mavenCentral("net.kyori", "adventure-platform-facet", Versions.ADVENTURE_PLATFORM));
+            dependencies.add(mavenCentral("net.kyori", "adventure-platform-viaversion", Versions.ADVENTURE_PLATFORM));
+            dependencies.add(mavenCentral("net.kyori", "adventure-text-serializer-bungeecord", Versions.ADVENTURE_PLATFORM));
+            dependencies.add(mavenCentral("net.kyori", "adventure-text-serializer-gson", adventureVersion));
+            dependencies.add(mavenCentral("net.kyori", "adventure-text-serializer-gson-legacy-impl", adventureVersion));
+            dependencies.add(mavenCentral("net.kyori", "adventure-nbt", adventureVersion));
+            if (isModernAdventureRuntime()) {
+                dependencies.add(mavenCentral("net.kyori", "adventure-text-serializer-json", adventureVersion));
+                dependencies.add(mavenCentral("net.kyori", "adventure-text-serializer-json-legacy-impl", adventureVersion));
+            }
+        }
+
+        return dependencies;
+    }
+
     public static RuntimeDependency of(String groupId, String artifactId, String version) {
         return new RuntimeDependency(groupId, artifactId, version);
     }
@@ -73,6 +129,17 @@ public class Dependencies {
         public static final String JITPACK = "https://jitpack.io/";
 
         protected Repositories() {
+        }
+    }
+
+    /** Versions used by BlueAPI runtime dependency profiles. */
+    public static class Versions {
+        public static final String ADVENTURE_LEGACY = "4.26.1";
+        public static final String ADVENTURE_MODERN = "5.1.1";
+        public static final String ADVENTURE_PLATFORM = "4.4.1";
+        public static final String EXAMINATION = "1.3.0";
+
+        protected Versions() {
         }
     }
 
@@ -313,5 +380,72 @@ public class Dependencies {
 
     private static boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
+    }
+
+    private static boolean nativeAdventureAudienceAvailable() {
+        try {
+            Class<?> audience = Class.forName("net.kyori.adventure.audience.Audience", false, Dependencies.class.getClassLoader());
+            Class<?> sender = Class.forName("org.bukkit.command.CommandSender", false, Dependencies.class.getClassLoader());
+            return audience.isAssignableFrom(sender);
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static boolean classExists(String className) {
+        try {
+            Class.forName(className, false, Dependencies.class.getClassLoader());
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static String adventureCoreRuntimeVersion() {
+        return isModernAdventureRuntime() ? Versions.ADVENTURE_MODERN : Versions.ADVENTURE_LEGACY;
+    }
+
+    /**
+     * Adventure 5.x is Java 21 bytecode. Use it only on modern Java/Minecraft
+     * runtimes; keep Adventure 4.x for old Bukkit/Spigot compatibility.
+     */
+    private static boolean isModernAdventureRuntime() {
+        return isJavaAtLeast(21) && isMinecraftAtLeast(1, 21);
+    }
+
+    private static boolean isJavaAtLeast(int required) {
+        String version = System.getProperty("java.specification.version", "0");
+        int major;
+        if (version.startsWith("1.")) {
+            major = parseInt(version.substring(2), 0);
+        } else {
+            int dot = version.indexOf('.');
+            major = parseInt(dot == -1 ? version : version.substring(0, dot), 0);
+        }
+        return major >= required;
+    }
+
+    private static boolean isMinecraftAtLeast(int requiredMajor, int requiredMinor) {
+        try {
+            String version = org.bukkit.Bukkit.getBukkitVersion().split("-")[0];
+            String[] parts = version.split("\\.");
+            int major = parts.length > 0 ? parseInt(parts[0], 0) : 0;
+            int minor = parts.length > 1 ? parseInt(parts[1], 0) : 0;
+
+            if (major != requiredMajor) {
+                return major > requiredMajor;
+            }
+            return minor >= requiredMinor;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static int parseInt(String value, int fallback) {
+        try {
+            return Integer.parseInt(value);
+        } catch (Throwable ignored) {
+            return fallback;
+        }
     }
 }

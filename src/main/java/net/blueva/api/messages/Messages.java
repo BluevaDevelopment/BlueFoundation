@@ -1,46 +1,137 @@
 package net.blueva.api.messages;
 
 import net.blueva.api.reflection.Reflection;
-import org.bukkit.ChatColor;
+import net.blueva.api.text.Text;
+import net.kyori.adventure.audience.Audience;
+import net.kyori.adventure.platform.bukkit.BukkitAudiences;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.title.Title;
+import org.bukkit.Bukkit;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.java.JavaPlugin;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.time.Duration;
 
-/** Multi-version player messaging helpers. */
+/** Adventure/MiniMessage player messaging helpers. */
 public class Messages {
+
+    private static BukkitAudiences bukkitAudiences;
 
     protected Messages() {
     }
 
-    public static String color(String message) {
-        return message == null ? "" : ChatColor.translateAlternateColorCodes('&', message);
+    /**
+     * Initializes Adventure transport for Spigot/Bukkit.
+     *
+     * <p>Call {@code BlueAPI.Dependencies.loadAdventure(plugin)} before this
+     * method on servers that do not provide Adventure natively.</p>
+     */
+    public static void init(JavaPlugin plugin) {
+        if (plugin == null || hasNativeAudience()) {
+            return;
+        }
+        close();
+        bukkitAudiences = BukkitAudiences.create(plugin);
+    }
+
+    public static void close() {
+        if (bukkitAudiences != null) {
+            bukkitAudiences.close();
+            bukkitAudiences = null;
+        }
+    }
+
+    public static Component component(String message) {
+        return Text.component(message);
+    }
+
+    /**
+     * Serializes MiniMessage/Adventure input to a legacy section string for
+     * Bukkit APIs that still only accept strings (inventory titles, item meta,
+     * old packet constructors, etc.).
+     */
+    public static String legacy(String message) {
+        return Text.legacySection(message);
     }
 
     public static void send(Player player, String message) {
-        if (player != null) {
-            player.sendMessage(color(message));
+        send((CommandSender) player, message);
+    }
+
+    public static void send(CommandSender sender, String message) {
+        if (sender == null) {
+            return;
         }
+
+        Component component = Text.component(message);
+        Audience audience = audience(sender);
+        if (audience != null) {
+            audience.sendMessage(component);
+            return;
+        }
+
+        sender.sendMessage(Text.legacySection(component));
     }
 
     public static boolean actionBar(Player player, String message) {
         if (player == null) {
             return false;
         }
-        String colored = color(message);
-        return sendActionBarViaSpigot(player, colored) || sendActionBarViaLegacyPacket(player, colored);
+
+        Component component = Text.component(message);
+        Audience audience = audience(player);
+        if (audience != null) {
+            audience.sendActionBar(component);
+            return true;
+        }
+
+        String legacy = Text.legacySection(component);
+        return sendActionBarViaSpigot(player, legacy) || sendActionBarViaLegacyPacket(player, legacy);
     }
 
     public static boolean title(Player player, String title, String subtitle, int fadeIn, int stay, int fadeOut) {
         if (player == null) {
             return false;
         }
-        String coloredTitle = color(title);
-        String coloredSubtitle = color(subtitle);
-        return sendTitleViaBukkit(player, coloredTitle, coloredSubtitle, fadeIn, stay, fadeOut)
-                || sendTitleViaSimpleBukkit(player, coloredTitle, coloredSubtitle)
-                || sendTitleViaLegacyPackets(player, coloredTitle, coloredSubtitle, fadeIn, stay, fadeOut);
+
+        Component titleComponent = Text.component(title);
+        Component subtitleComponent = Text.component(subtitle);
+        Audience audience = audience(player);
+        if (audience != null) {
+            audience.showTitle(Title.title(titleComponent, subtitleComponent, titleTimes(fadeIn, stay, fadeOut)));
+            return true;
+        }
+
+        String legacyTitle = Text.legacySection(titleComponent);
+        String legacySubtitle = Text.legacySection(subtitleComponent);
+        return sendTitleViaBukkit(player, legacyTitle, legacySubtitle, fadeIn, stay, fadeOut)
+                || sendTitleViaSimpleBukkit(player, legacyTitle, legacySubtitle)
+                || sendTitleViaLegacyPackets(player, legacyTitle, legacySubtitle, fadeIn, stay, fadeOut);
+    }
+
+    public static Audience audience(Player player) {
+        return audience((CommandSender) player);
+    }
+
+    public static Audience audience(CommandSender sender) {
+        if (sender == null) {
+            return null;
+        }
+        if (sender instanceof Audience) {
+            return (Audience) sender;
+        }
+        if (bukkitAudiences != null) {
+            return bukkitAudiences.sender(sender);
+        }
+        return null;
+    }
+
+    public static Audience console() {
+        return audience(Bukkit.getConsoleSender());
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -138,6 +229,31 @@ public class Messages {
                 Reflection.sendPacket(player, messageConstructor.newInstance(subtitleAction, textConstructor.newInstance(subtitle)));
             }
             return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static Title.Times titleTimes(int fadeIn, int stay, int fadeOut) {
+        Duration fadeInDuration = ticks(fadeIn);
+        Duration stayDuration = ticks(stay);
+        Duration fadeOutDuration = ticks(fadeOut);
+        try {
+            return (Title.Times) Title.Times.class
+                    .getMethod("of", Duration.class, Duration.class, Duration.class)
+                    .invoke(null, fadeInDuration, stayDuration, fadeOutDuration);
+        } catch (Throwable ignored) {
+            return Title.Times.times(fadeInDuration, stayDuration, fadeOutDuration);
+        }
+    }
+
+    private static Duration ticks(int ticks) {
+        return Duration.ofMillis(Math.max(0, ticks) * 50L);
+    }
+
+    private static boolean hasNativeAudience() {
+        try {
+            return Bukkit.getConsoleSender() instanceof Audience;
         } catch (Throwable ignored) {
             return false;
         }
