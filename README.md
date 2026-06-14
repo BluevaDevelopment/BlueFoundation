@@ -44,6 +44,7 @@ BlueAPI.Commands
 BlueAPI.Messages
 BlueAPI.Text
 BlueAPI.Events
+BlueAPI.Configs
 ```
 
 ## Runtime dependencies
@@ -54,8 +55,7 @@ It downloads Maven artifacts into the plugin's `libraries` folder and injects th
 
 ```java
 BlueAPI.Dependencies.load(this, BlueAPI.Dependencies.list(
-        BlueAPI.Dependencies.mavenCentral("dev.dejvokep", "boosted-yaml", "1.3.7"),
-        BlueAPI.Dependencies.jitPack("com.github.MrMicky-FR", "FastBoard", "2.1.5")
+        BlueAPI.Dependencies.jitPack("com.github.Eisi05", "NpcApi", "2.2.2")
 ));
 ```
 
@@ -63,10 +63,10 @@ You can also create dependency descriptors directly:
 
 ```java
 BlueAPI.Dependencies.RuntimeDependency dependency = new BlueAPI.Dependencies.RuntimeDependency(
-        "dev.dejvokep",
-        "boosted-yaml",
-        "1.3.7",
-        BlueAPI.Dependencies.Repositories.MAVEN_CENTRAL
+        "com.github.Eisi05",
+        "NpcApi",
+        "2.2.2",
+        BlueAPI.Dependencies.Repositories.JITPACK
 );
 
 BlueAPI.Dependencies.loader(this).load(dependency);
@@ -272,6 +272,81 @@ BlueAPI.Commands.register(
         )
 );
 ```
+
+## Configs
+
+`BlueAPI.Configs` loads YAML and TOML configs without wrapping another config API. Both formats use the same internal tree, getters, comments and auto-update logic, so plugins can start on YAML and migrate to TOML later without changing the config-facing code style.
+
+YAML usage:
+
+```java
+ConfigFile config = BlueAPI.Configs.yaml(this, "config.yml");
+
+boolean enabled = config.getBoolean("features.enabled", true);
+int limit = config.getInt("limits.players", 100);
+double multiplier = config.getDouble("economy.multiplier", 1.0D);
+List<String> worlds = config.getStringList("worlds");
+Map<String, Object> database = config.getMap("database");
+List<String> featureKeys = config.keys("features");
+
+config.set("features.enabled", false);
+config.setIfAbsent("features.mode", "default");
+config.comment("features.enabled", "Master toggle for this feature.");
+config.inlineComment("features.mode", "Used only when no arena overrides it.");
+config.save();
+```
+
+Example YAML default:
+
+```yaml
+features:
+  enabled: true
+  mode: default
+
+worlds:
+  - world
+  - nether
+
+database:
+  host: localhost
+  port: 3306
+
+npcs:
+  - name: Bob
+    type: villager
+```
+
+TOML usage:
+
+```java
+ConfigFile config = BlueAPI.Configs.toml(this, "config.toml");
+
+boolean enabled = config.getBoolean("features.enabled", true);
+List<Object> npcs = config.getList("npcs");
+ConfigDateTime createdAt = config.getDateTime("metadata.created_at");
+```
+
+Example TOML default:
+
+```toml
+[features]
+enabled = true
+mode = "default"
+
+worlds = ["world", "nether"]
+
+[database]
+host = "localhost"
+port = 3306
+
+[[npcs]]
+name = "Bob"
+type = "villager"
+```
+
+Bundled defaults are copied from the plugin jar and updated on startup. BlueAPI stores technical update metadata in a hidden `.blueapi/config-cache` file. When bundled defaults change, values and lists are updated only if the user still had the previous default. User-edited values are preserved. Comments are refreshed when they still match the previous bundled comments, while custom comments are kept. File writes are atomic where the filesystem supports it, and changed files are backed up under `.blueapi/config-backups`.
+
+YAML uses conservative YAML 1.2-style booleans, so only `true` and `false` are parsed as booleans. TOML includes date/time and array-of-table support. Parse failures include format, line and column details.
 
 ## Multi-version events
 

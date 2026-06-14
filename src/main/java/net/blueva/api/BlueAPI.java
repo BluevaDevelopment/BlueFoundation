@@ -66,4 +66,9 @@ public final class BlueAPI {
         private Events() {
         }
     }
+
+    public static class Configs extends net.blueva.api.config.Configs {
+        private Configs() {
+        }
+    }
 }
