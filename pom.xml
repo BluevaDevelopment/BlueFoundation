@@ -20,6 +20,14 @@
             <url>https://hub.spigotmc.org/nexus/content/repositories/snapshots/</url>
         </repository>
         <repository>
+            <id>sonatype</id>
+            <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
+        </repository>
+        <repository>
+            <id>aikar</id>
+            <url>https://repo.aikar.co/nexus/content/repositories/aikar/</url>
+        </repository>
+        <repository>
             <id>mojang</id>
             <url>https://libraries.minecraft.net/</url>
         </repository>
