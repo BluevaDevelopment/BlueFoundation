@@ -71,4 +71,9 @@ public final class BlueAPI {
         private Configs() {
         }
     }
+
+    public static class NPCs extends net.blueva.api.npc.NPCs {
+        private NPCs() {
+        }
+    }
 }

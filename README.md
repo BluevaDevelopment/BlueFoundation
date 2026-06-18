@@ -45,6 +45,7 @@ BlueAPI.Messages
 BlueAPI.Text
 BlueAPI.Events
 BlueAPI.Configs
+BlueAPI.NPCs
 ```
 
 ## Runtime dependencies
@@ -347,6 +348,75 @@ type = "villager"
 Bundled defaults are copied from the plugin jar and updated on startup. BlueAPI stores technical update metadata in a hidden `.blueapi/config-cache` file. When bundled defaults change, values and lists are updated only if the user still had the previous default. User-edited values are preserved. Comments are refreshed when they still match the previous bundled comments, while custom comments are kept. File writes are atomic where the filesystem supports it, and changed files are backed up under `.blueapi/config-backups`.
 
 YAML uses conservative YAML 1.2-style booleans, so only `true` and `false` are parsed as booleans. TOML includes date/time and array-of-table support. Parse failures include format, line and column details.
+
+## NPCs
+
+`BlueAPI.NPCs` creates packet-based player NPCs that work across Bukkit/Spigot/Paper versions without depending on versioned NMS package names. It builds a fake `ServerPlayer`/`EntityPlayer` internally and sends spawn, equipment, teleport, animation and destroy packets only to selected viewers.
+
+This approach avoids the `ArrayIndexOutOfBoundsException` that affects NpcApi on modern Paper versions, because version detection is handled by `BlueAPI.Version` instead of parsing `Bukkit.getServer().getClass().getPackage().getName()`.
+
+> **Status:** usable MVP. Core features are implemented and the module compiles, but it has not yet been battle-tested on every modern Paper build. Feedback from real servers is welcome.
+
+Initialize and shut down the module:
+
+```java
+@Override
+public void onEnable() {
+    BlueAPI.NPCs.init(this);
+}
+
+@Override
+public void onDisable() {
+    BlueAPI.NPCs.close();
+}
+```
+
+Create and show an NPC:
+
+```java
+Npc npc = BlueAPI.NPCs.create(location, "Shop Keeper");
+npc.skin(Skin.fromPlayer(somePlayer));
+npc.equipment(helmet, chestplate, leggings, boots, mainHand, offHand);
+npc.showTo(player);
+```
+
+The `equipment` array follows the server's `EquipmentSlot` enum order. On modern versions that order is typically: main hand, off hand, feet, legs, chest, head.
+
+Handle interactions:
+
+```java
+npc.onClick(event -> {
+    if (event.getClickType() == NpcClickEvent.ClickType.RIGHT) {
+        BlueAPI.Messages.send(event.getPlayer(), "<green>Hello!");
+    }
+});
+```
+
+Movement, animations and cleanup:
+
+```java
+npc.teleport(newLocation);
+npc.lookAt(targetPlayer);
+npc.animate(NpcAnimation.SWING_MAIN_ARM);
+npc.hideFrom(player);
+npc.destroy();
+```
+
+Skins can also be fetched asynchronously from Mojang:
+
+```java
+Skin.fetch(this, playerUuid, skin -> {
+    if (skin != null) {
+        npc.skin(skin);
+    }
+});
+```
+
+Events fired by the module:
+
+- `NpcSpawnEvent` — when an NPC is shown to a player.
+- `NpcDespawnEvent` — when an NPC is hidden from a player.
+- `NpcClickEvent` — when a player left/right-clicks an NPC.
 
 ## Multi-version events
 
