@@ -23,10 +23,7 @@
             <id>sonatype</id>
             <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
         </repository>
-        <repository>
-            <id>aikar</id>
-            <url>https://repo.aikar.co/nexus/content/repositories/aikar/</url>
-        </repository>
+
         <repository>
             <id>mojang</id>
             <url>https://libraries.minecraft.net/</url>
@@ -41,6 +38,12 @@
             <artifactId>spigot-api</artifactId>
             <version>1.8.8-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>net.md-5</groupId>
+                    <artifactId>bungeecord-chat</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>net.kyori</groupId>
