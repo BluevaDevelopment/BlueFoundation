@@ -55,8 +55,11 @@ final class NpcPlayer {
                 return null;
             }
 
-            Constructor<?> constructor = serverPlayerClass.getDeclaredConstructor(
+            Constructor<?> constructor = findConstructor(serverPlayerClass,
                     server.getClass(), level.getClass(), GameProfile.class, clientInfoClass);
+            if (constructor == null) {
+                return null;
+            }
             constructor.setAccessible(true);
             Object serverPlayer = constructor.newInstance(server, level, profile, clientInfo);
 
@@ -86,7 +89,7 @@ final class NpcPlayer {
             Constructor<?> interactConstructor = null;
             for (Constructor<?> c : interactManagerClass.getDeclaredConstructors()) {
                 Class<?>[] params = c.getParameterTypes();
-                if (params.length == 1 && level.getClass().isAssignableFrom(params[0])) {
+                if (params.length == 1 && params[0].isAssignableFrom(level.getClass())) {
                     interactConstructor = c;
                     break;
                 }
@@ -97,8 +100,11 @@ final class NpcPlayer {
             interactConstructor.setAccessible(true);
             Object interactManager = interactConstructor.newInstance(level);
 
-            Constructor<?> constructor = entityPlayerClass.getDeclaredConstructor(
+            Constructor<?> constructor = findConstructor(entityPlayerClass,
                     server.getClass(), level.getClass(), GameProfile.class, interactManagerClass);
+            if (constructor == null) {
+                return null;
+            }
             constructor.setAccessible(true);
             Object entityPlayer = constructor.newInstance(server, level, profile, interactManager);
 
@@ -119,6 +125,30 @@ final class NpcPlayer {
         } catch (Throwable ignored) {
             return null;
         }
+    }
+
+    private static Constructor<?> findConstructor(Class<?> type, Class<?>... argumentTypes) {
+        if (type == null || argumentTypes == null) {
+            return null;
+        }
+        for (Constructor<?> constructor : type.getDeclaredConstructors()) {
+            Class<?>[] parameters = constructor.getParameterTypes();
+            if (parameters.length != argumentTypes.length) {
+                continue;
+            }
+            boolean matches = true;
+            for (int i = 0; i < parameters.length; i++) {
+                Class<?> argumentType = argumentTypes[i];
+                if (argumentType == null || !parameters[i].isAssignableFrom(argumentType)) {
+                    matches = false;
+                    break;
+                }
+            }
+            if (matches) {
+                return constructor;
+            }
+        }
+        return null;
     }
 
     private static Object getServerLevel(World world) {
