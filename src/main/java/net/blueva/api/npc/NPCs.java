@@ -84,11 +84,19 @@ public class NPCs {
      */
     public static Npc create(Location location, UUID uuid, String name) {
         ensureInitialized();
-        String internalName = "NPC-" + uuid.toString().substring(0, 8);
+        String internalName = internalName(uuid, name);
         NpcImpl npc = new NpcImpl(location, uuid, internalName);
         npc.name(name);
         NpcRegistry.register(npc);
         return npc;
+    }
+
+    private static String internalName(UUID uuid, String name) {
+        String normalized = name == null ? "" : name.replaceAll("[^A-Za-z0-9_]", "");
+        if (normalized.isEmpty()) {
+            return "NPC_" + uuid.toString().replace("-", "").substring(0, 8);
+        }
+        return normalized.length() > 16 ? normalized.substring(0, 16) : normalized;
     }
 
     private static void ensureInitialized() {
