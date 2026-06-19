@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.Set;
 
 /**
  * Builds and sends NMS packets for player NPCs.
@@ -53,7 +54,7 @@ final class NpcPackets {
         }
         Object packet;
         if (Version.isAtLeast(1, 20)) {
-            packet = newPacket("ClientboundAddEntityPacket", "PacketPlayOutSpawnEntity", serverPlayer);
+            packet = newModernSpawnPacket(serverPlayer);
         } else if (Version.isAtLeast(1, 19)) {
             packet = newPacket("ClientboundAddPlayerPacket", "PacketPlayOutNamedEntitySpawn", serverPlayer);
         } else {
@@ -76,7 +77,7 @@ final class NpcPackets {
                         "net.minecraft.network.protocol.game.ClientboundSetEntityDataPacket");
                 Constructor<?> constructor = packetClass.getDeclaredConstructor(int.class, List.class);
                 constructor.setAccessible(true);
-                packet = constructor.newInstance(entityId, Collections.emptyList());
+                packet = constructor.newInstance(entityId, packedEntityData(dataWatcher));
             } else if (Version.isAtLeast(1, 9)) {
                 Class<?> packetClass = Reflection.nmsClass("PacketPlayOutEntityMetadata");
                 Constructor<?> constructor = packetClass.getDeclaredConstructor(int.class, getDataWatcherClass(), boolean.class);
@@ -119,7 +120,9 @@ final class NpcPackets {
         }
         updatePosition(serverPlayer, location);
         Object packet;
-        if (Version.isAtLeast(1, 17)) {
+        if (Version.isAtLeast(1, 21)) {
+            packet = newModernTeleport(serverPlayer);
+        } else if (Version.isAtLeast(1, 17)) {
             packet = newPacket("ClientboundTeleportEntityPacket", "PacketPlayOutEntityTeleport", serverPlayer);
         } else {
             packet = newPacket("PacketPlayOutEntityTeleport", serverPlayer);
@@ -281,6 +284,59 @@ final class NpcPackets {
         return null;
     }
 
+    private static Object newModernSpawnPacket(Object serverPlayer) {
+        try {
+            Class<?> packetClass = Reflection.nmsClass("ClientboundAddEntityPacket",
+                    "net.minecraft.network.protocol.game.ClientboundAddEntityPacket");
+            Class<?> entityTypeClass = Reflection.findClass("net.minecraft.world.entity.EntityType");
+            Class<?> vec3Class = Reflection.findClass("net.minecraft.world.phys.Vec3");
+            if (packetClass == null || entityTypeClass == null || vec3Class == null) {
+                return null;
+            }
+
+            Constructor<?> constructor = packetClass.getDeclaredConstructor(int.class, UUID.class,
+                    double.class, double.class, double.class, float.class, float.class,
+                    entityTypeClass, int.class, vec3Class, double.class);
+            constructor.setAccessible(true);
+            return constructor.newInstance(
+                    intValue(serverPlayer, "getId"),
+                    uuidValue(serverPlayer),
+                    doubleValue(serverPlayer, "getX"),
+                    doubleValue(serverPlayer, "getY"),
+                    doubleValue(serverPlayer, "getZ"),
+                    floatValue(serverPlayer, "getXRot"),
+                    floatValue(serverPlayer, "getYRot"),
+                    invokeNoArg(serverPlayer, "getType"),
+                    0,
+                    vec3Value(serverPlayer),
+                    (double) floatValue(serverPlayer, "getYRot"));
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static Object newModernTeleport(Object serverPlayer) {
+        try {
+            Class<?> packetClass = Reflection.nmsClass("ClientboundTeleportEntityPacket",
+                    "net.minecraft.network.protocol.game.ClientboundTeleportEntityPacket");
+            Class<?> entityClass = Reflection.findClass("net.minecraft.world.entity.Entity");
+            Class<?> positionMoveRotationClass = Reflection.findClass("net.minecraft.world.entity.PositionMoveRotation");
+            if (packetClass == null || entityClass == null || positionMoveRotationClass == null) {
+                return null;
+            }
+
+            Method of = positionMoveRotationClass.getMethod("of", entityClass);
+            of.setAccessible(true);
+            Object change = of.invoke(null, serverPlayer);
+            Constructor<?> constructor = packetClass.getDeclaredConstructor(int.class, positionMoveRotationClass, Set.class, boolean.class);
+            constructor.setAccessible(true);
+            return constructor.newInstance(intValue(serverPlayer, "getId"), change, Collections.emptySet(), booleanValue(serverPlayer, "onGround"));
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+
     private static Object newModernEquipment(int entityId, ItemStack[] equipment) {
         try {
             Class<?> packetClass = Reflection.nmsClass("ClientboundSetEquipmentPacket",
@@ -363,7 +419,10 @@ final class NpcPackets {
             if (packetClass == null) {
                 return null;
             }
-            Constructor<?> constructor = packetClass.getDeclaredConstructor(serverPlayer.getClass().getSuperclass(), byte.class);
+            Constructor<?> constructor = findConstructor(packetClass, serverPlayer.getClass(), byte.class);
+            if (constructor == null) {
+                return null;
+            }
             constructor.setAccessible(true);
             return constructor.newInstance(serverPlayer, angleToByte(yaw));
         } catch (Throwable ignored) {
@@ -489,6 +548,111 @@ final class NpcPackets {
 
     private static byte angleToByte(float angle) {
         return (byte) ((angle * 256.0F) / 360.0F);
+    }
+
+    private static List<?> packedEntityData(Object dataWatcher) {
+        if (dataWatcher == null) {
+            return Collections.emptyList();
+        }
+        try {
+            Method packAll = dataWatcher.getClass().getMethod("packAll");
+            packAll.setAccessible(true);
+            Object values = packAll.invoke(dataWatcher);
+            if (values instanceof List<?>) {
+                return (List<?>) values;
+            }
+        } catch (Throwable ignored) {
+        }
+        try {
+            Method nonDefault = dataWatcher.getClass().getMethod("getNonDefaultValues");
+            nonDefault.setAccessible(true);
+            Object values = nonDefault.invoke(dataWatcher);
+            if (values instanceof List<?>) {
+                return (List<?>) values;
+            }
+        } catch (Throwable ignored) {
+        }
+        return Collections.emptyList();
+    }
+
+    private static Constructor<?> findConstructor(Class<?> type, Class<?>... argumentTypes) {
+        if (type == null || argumentTypes == null) {
+            return null;
+        }
+        for (Constructor<?> constructor : type.getDeclaredConstructors()) {
+            Class<?>[] parameters = constructor.getParameterTypes();
+            if (parameters.length != argumentTypes.length) {
+                continue;
+            }
+            boolean matches = true;
+            for (int i = 0; i < parameters.length; i++) {
+                Class<?> argumentType = argumentTypes[i];
+                if (argumentType == null || !wrap(parameters[i]).isAssignableFrom(wrap(argumentType))) {
+                    matches = false;
+                    break;
+                }
+            }
+            if (matches) {
+                return constructor;
+            }
+        }
+        return null;
+    }
+
+    private static Object invokeNoArg(Object target, String methodName) {
+        if (target == null) {
+            return null;
+        }
+        Method method = findMethod(target.getClass(), methodName);
+        if (method == null) {
+            return null;
+        }
+        try {
+            method.setAccessible(true);
+            return method.invoke(target);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static int intValue(Object target, String methodName) {
+        Object value = invokeNoArg(target, methodName);
+        return value instanceof Number ? ((Number) value).intValue() : 0;
+    }
+
+    private static double doubleValue(Object target, String methodName) {
+        Object value = invokeNoArg(target, methodName);
+        return value instanceof Number ? ((Number) value).doubleValue() : 0.0D;
+    }
+
+    private static float floatValue(Object target, String methodName) {
+        Object value = invokeNoArg(target, methodName);
+        return value instanceof Number ? ((Number) value).floatValue() : 0.0F;
+    }
+
+    private static boolean booleanValue(Object target, String methodName) {
+        Object value = invokeNoArg(target, methodName);
+        return value instanceof Boolean && (Boolean) value;
+    }
+
+    private static UUID uuidValue(Object target) {
+        Object value = invokeNoArg(target, "getUUID");
+        return value instanceof UUID ? (UUID) value : UUID.randomUUID();
+    }
+
+    private static Object vec3Value(Object serverPlayer) {
+        Object movement = invokeNoArg(serverPlayer, "getDeltaMovement");
+        if (movement != null) {
+            return movement;
+        }
+        try {
+            Class<?> vec3Class = Reflection.findClass("net.minecraft.world.phys.Vec3");
+            Constructor<?> constructor = vec3Class.getDeclaredConstructor(double.class, double.class, double.class);
+            constructor.setAccessible(true);
+            return constructor.newInstance(0.0D, 0.0D, 0.0D);
+        } catch (Throwable ignored) {
+            return null;
+        }
     }
 
     private static Class<?> wrap(Class<?> clazz) {
