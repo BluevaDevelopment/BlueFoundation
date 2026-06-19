@@ -173,7 +173,7 @@ final class NpcPackets {
             if (packetClass == null) {
                 return null;
             }
-            Method method = packetClass.getMethod("createPlayerInitializing", Iterable.class);
+            Method method = packetClass.getMethod("createPlayerInitializing", java.util.Collection.class);
             method.setAccessible(true);
             return method.invoke(null, Collections.singletonList(serverPlayer));
         } catch (Throwable ignored) {
