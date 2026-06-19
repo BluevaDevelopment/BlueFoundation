@@ -449,7 +449,10 @@ final class NpcPackets {
                 constructor.setAccessible(true);
                 Class<?>[] params = constructor.getParameterTypes();
                 if (params.length == 1) {
-                    if (params[0] == int.class || (params[0].isArray() && params[0].getComponentType() == int.class)) {
+                    if (params[0].isArray() && params[0].getComponentType() == int.class) {
+                        return constructor.newInstance(new int[]{entityId});
+                    }
+                    if (params[0] == int.class) {
                         return constructor.newInstance(entityId);
                     }
                     if (params[0].getName().contains("IntList")) {
