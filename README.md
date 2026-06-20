@@ -136,11 +136,12 @@ Object handle = BlueAPI.Reflection.getHandle(player);
 
 ## Materials and sounds
 
-`BlueAPI.Materials` and `BlueAPI.Sounds` resolve renamed enum constants safely by trying multiple names.
+`BlueAPI.Materials` and `BlueAPI.Sounds` resolve renamed constants safely by trying multiple names. Sounds also accept modern namespaced keys on servers that expose the Bukkit sound registry.
 
 ```java
 Material oakSign = BlueAPI.Materials.require("OAK_SIGN", "SIGN");
 Sound levelUp = BlueAPI.Sounds.require("ENTITY_PLAYER_LEVELUP", "LEVEL_UP");
+Sound pling = BlueAPI.Sounds.require("minecraft:block.note_block.pling", "NOTE_PLING");
 
 BlueAPI.Sounds.play(player, 1.0F, 1.0F, "ENTITY_PLAYER_LEVELUP", "LEVEL_UP");
 ```
