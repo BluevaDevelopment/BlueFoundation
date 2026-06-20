@@ -172,6 +172,7 @@ BlueAPI.Items.customModelData(item, 1001);
 BlueAPI.Items.pdcString(item, "myplugin", "item_id", "selector");
 String itemId = BlueAPI.Items.pdcString(item, "myplugin", "item_id");
 BlueAPI.Items.skullTexture(item, "http://textures.minecraft.net/texture/...");
+BlueAPI.Items.skullValue(item, "{player}", player);
 BlueAPI.Items.editMeta(item, meta -> {
     // Add plugin-specific metadata without leaving the BlueAPI item flow.
 });

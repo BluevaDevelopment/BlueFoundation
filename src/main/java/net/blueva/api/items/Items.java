@@ -6,7 +6,9 @@ import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
 import org.bukkit.Material;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.enchantments.Enchantment;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -262,11 +264,22 @@ public class Items {
         });
     }
 
-    public static ItemStack skullValue(ItemStack item, String value) {
-        if (isMinecraftPlayerName(value)) {
-            return skullOwner(item, value);
-        }
-        return skullTexture(item, value);
+    public static ItemStack skullValue(ItemStack item, final String value) {
+        return skullValue(item, value, null);
+    }
+
+    public static ItemStack skullValue(ItemStack item, final String value, final OfflinePlayer currentPlayer) {
+        return editMeta(item, new TypedMetaEditor<SkullMeta>() {
+            @Override
+            public Class<SkullMeta> type() {
+                return SkullMeta.class;
+            }
+
+            @Override
+            public void edit(SkullMeta meta) {
+                applySkullValue(meta, value, currentPlayer);
+            }
+        });
     }
 
     public static ItemStack leatherColor(ItemStack item, Color color) {
@@ -572,6 +585,205 @@ public class Items {
         }
     }
 
+    private static boolean applySkullValue(SkullMeta meta, String value, OfflinePlayer currentPlayer) {
+        if (meta == null || isBlank(value)) {
+            return false;
+        }
+
+        String trimmed = value.trim();
+        OfflinePlayer resolvedCurrent = resolveCurrentPlayer(trimmed, currentPlayer);
+        if (resolvedCurrent != null && applyOfflinePlayerProfile(meta, resolvedCurrent)) {
+            return true;
+        }
+
+        UUID uuid = parseUuid(trimmed);
+        String playerName = resolvePlayerName(uuid, trimmed);
+        if (playerName != null && applyPlayerNameProfile(meta, playerName)) {
+            return true;
+        }
+
+        if (isTextureValue(trimmed) && applySkullTexture(meta, trimmed)) {
+            return true;
+        }
+
+        if (uuid == null && !isMinecraftPlayerName(trimmed)) {
+            return false;
+        }
+
+        Object profile = resolvePlayerProfile(uuid, trimmed);
+        if (hasSkinTexture(profile) && applyProfile(meta, profile)) {
+            return true;
+        }
+
+        OfflinePlayer offline = resolveOfflinePlayer(uuid, trimmed);
+        return offline != null && applyOfflinePlayerProfile(meta, offline);
+    }
+
+    private static OfflinePlayer resolveCurrentPlayer(String value, OfflinePlayer currentPlayer) {
+        if (currentPlayer == null || isBlank(value)) {
+            return null;
+        }
+        if ("{player}".equalsIgnoreCase(value)) {
+            return currentPlayer;
+        }
+        String name = currentPlayer.getName();
+        if (name != null && value.equalsIgnoreCase(name)) {
+            return currentPlayer;
+        }
+        UUID uuid = parseUuid(value);
+        return uuid != null && uuid.equals(currentPlayer.getUniqueId()) ? currentPlayer : null;
+    }
+
+    private static boolean applyPlayerNameProfile(SkullMeta meta, String playerName) {
+        if (meta == null || !isMinecraftPlayerName(playerName)) {
+            return false;
+        }
+        try {
+            Method creator = Bukkit.class.getMethod("createPlayerProfile", String.class);
+            Object profile = creator.invoke(null, playerName);
+            if (applyProfile(meta, profile)) {
+                return true;
+            }
+        } catch (Throwable ignored) {
+        }
+        try {
+            meta.setOwner(playerName);
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static boolean applyOfflinePlayerProfile(SkullMeta meta, OfflinePlayer player) {
+        if (meta == null || player == null) {
+            return false;
+        }
+
+        Object profile = getPlayerProfile(player);
+        if (hasSkinTexture(profile) && applyProfile(meta, profile)) {
+            return true;
+        }
+
+        try {
+            Method setter = meta.getClass().getMethod("setOwningPlayer", OfflinePlayer.class);
+            setter.invoke(meta, player);
+            return true;
+        } catch (Throwable ignored) {
+        }
+
+        String name = player.getName();
+        return !isBlank(name) && applyPlayerNameProfile(meta, name);
+    }
+
+    private static String resolvePlayerName(UUID uuid, String value) {
+        if (uuid == null) {
+            return isMinecraftPlayerName(value) ? value : null;
+        }
+
+        Player online = getOnlinePlayer(uuid);
+        if (online != null && isMinecraftPlayerName(online.getName())) {
+            return online.getName();
+        }
+
+        OfflinePlayer offline = getOfflinePlayer(uuid);
+        String name = offline == null ? null : offline.getName();
+        return isMinecraftPlayerName(name) ? name : null;
+    }
+
+    private static Object resolvePlayerProfile(UUID uuid, String value) {
+        if (uuid != null) {
+            Player online = getOnlinePlayer(uuid);
+            Object onlineProfile = getPlayerProfile(online);
+            if (hasSkinTexture(onlineProfile)) {
+                return onlineProfile;
+            }
+            return getPlayerProfile(getOfflinePlayer(uuid));
+        }
+
+        if (!isMinecraftPlayerName(value)) {
+            return null;
+        }
+
+        Player online = Bukkit.getPlayerExact(value);
+        Object onlineProfile = getPlayerProfile(online);
+        if (hasSkinTexture(onlineProfile)) {
+            return onlineProfile;
+        }
+        return getPlayerProfile(Bukkit.getOfflinePlayer(value));
+    }
+
+    private static OfflinePlayer resolveOfflinePlayer(UUID uuid, String value) {
+        if (uuid != null) {
+            return getOfflinePlayer(uuid);
+        }
+        return isBlank(value) ? null : Bukkit.getOfflinePlayer(value);
+    }
+
+    private static Player getOnlinePlayer(UUID uuid) {
+        if (uuid == null) {
+            return null;
+        }
+        try {
+            Method getter = Bukkit.class.getMethod("getPlayer", UUID.class);
+            Object player = getter.invoke(null, uuid);
+            return player instanceof Player ? (Player) player : null;
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static OfflinePlayer getOfflinePlayer(UUID uuid) {
+        if (uuid == null) {
+            return null;
+        }
+        try {
+            Method getter = Bukkit.class.getMethod("getOfflinePlayer", UUID.class);
+            Object player = getter.invoke(null, uuid);
+            return player instanceof OfflinePlayer ? (OfflinePlayer) player : null;
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static Object getPlayerProfile(OfflinePlayer player) {
+        if (player == null) {
+            return null;
+        }
+        try {
+            Method getter = player.getClass().getMethod("getPlayerProfile");
+            return getter.invoke(player);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static boolean hasSkinTexture(Object profile) {
+        if (profile == null) {
+            return false;
+        }
+        try {
+            Object textures = profile.getClass().getMethod("getTextures").invoke(profile);
+            Object skin = textures.getClass().getMethod("getSkin").invoke(textures);
+            return skin != null;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static boolean isTextureValue(String value) {
+        if (isBlank(value)) {
+            return false;
+        }
+        String trimmed = value.trim();
+        if (!isBlank(textureUrl(trimmed))) {
+            return true;
+        }
+        if (!isBlank(extractTextureUrl(trimmed))) {
+            return true;
+        }
+        return trimmed.length() > 64 && trimmed.matches("^[A-Za-z0-9+/=]+$");
+    }
+
     private static boolean applySkullTexture(SkullMeta meta, String value) {
         if (meta == null || isBlank(value)) {
             return false;
@@ -725,6 +937,17 @@ public class Items {
 
     private static boolean isMinecraftPlayerName(String value) {
         return value != null && value.length() >= 3 && value.length() <= 16 && value.matches("^[a-zA-Z0-9_]+$");
+    }
+
+    private static UUID parseUuid(String value) {
+        if (isBlank(value)) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value.trim());
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 
     private static String modernToLegacyEnchantment(String normalized) {
