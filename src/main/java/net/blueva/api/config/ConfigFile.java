@@ -46,6 +46,18 @@ public class ConfigFile {
         return document.get(path);
     }
 
+    public ConfigSection rootSection() {
+        return document.rootSection();
+    }
+
+    public ConfigSection section(String path) {
+        return document.section(path);
+    }
+
+    public ConfigSection sectionOrCreate(String path) {
+        return document.sectionOrCreate(path);
+    }
+
     public String getString(String path) {
         Object value = get(path);
         return value == null ? "" : String.valueOf(value);

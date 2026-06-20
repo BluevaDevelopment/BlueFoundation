@@ -5,6 +5,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 /** BlueAPI configuration entry point. */
@@ -71,6 +72,10 @@ public class Configs {
 
     public static ConfigDocument parse(String text, ConfigFormat format) {
         return ConfigCodecs.of(format).read(text);
+    }
+
+    public static ConfigDocument read(Path file, ConfigFormat format) throws IOException {
+        return parse(new String(Files.readAllBytes(file), StandardCharsets.UTF_8), format);
     }
 
     public static String write(ConfigDocument document, ConfigFormat format) {

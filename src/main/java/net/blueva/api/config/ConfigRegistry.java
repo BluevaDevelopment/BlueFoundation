@@ -114,6 +114,21 @@ public final class ConfigRegistry {
         return entry != null && entry.contains(path);
     }
 
+    public ConfigSection rootSection(String fileName) {
+        Entry entry = entries.get(fileName);
+        return entry == null ? null : entry.rootSection();
+    }
+
+    public ConfigSection section(String fileName, String path) {
+        Entry entry = entries.get(fileName);
+        return entry == null ? null : entry.section(path);
+    }
+
+    public ConfigSection sectionOrCreate(String fileName, String path) {
+        Entry entry = entries.get(fileName);
+        return entry == null ? null : entry.sectionOrCreate(path);
+    }
+
     public ConfigRegistry set(String fileName, String path, Object value) {
         Entry entry = entries.get(fileName);
         if (entry != null) {
@@ -228,6 +243,12 @@ public final class ConfigRegistry {
 
         void set(String path, Object value);
 
+        ConfigSection rootSection();
+
+        ConfigSection section(String path);
+
+        ConfigSection sectionOrCreate(String path);
+
         void reload() throws IOException;
 
         void save() throws IOException;
@@ -253,6 +274,21 @@ public final class ConfigRegistry {
         @Override
         public void set(String path, Object value) {
             config.set(path, value);
+        }
+
+        @Override
+        public ConfigSection rootSection() {
+            return config.rootSection();
+        }
+
+        @Override
+        public ConfigSection section(String path) {
+            return config.section(path);
+        }
+
+        @Override
+        public ConfigSection sectionOrCreate(String path) {
+            return config.sectionOrCreate(path);
         }
 
         @Override
@@ -290,6 +326,21 @@ public final class ConfigRegistry {
         @Override
         public void set(String path, Object value) {
             document.set(path, value);
+        }
+
+        @Override
+        public ConfigSection rootSection() {
+            return document.rootSection();
+        }
+
+        @Override
+        public ConfigSection section(String path) {
+            return document.section(path);
+        }
+
+        @Override
+        public ConfigSection sectionOrCreate(String path) {
+            return document.sectionOrCreate(path);
         }
 
         @Override

@@ -25,6 +25,19 @@ public class ConfigDocument {
         return node == null ? null : node.getValue();
     }
 
+    public ConfigSection section(String path) {
+        return node(path) == null ? null : new ConfigSection(this, path);
+    }
+
+    public ConfigSection sectionOrCreate(String path) {
+        nodeOrCreate(path);
+        return new ConfigSection(this, path);
+    }
+
+    public ConfigSection rootSection() {
+        return new ConfigSection(this, "");
+    }
+
     public void set(String path, Object value) {
         nodeOrCreate(path).setValue(value);
     }
