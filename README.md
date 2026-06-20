@@ -165,8 +165,21 @@ Useful helpers:
 ```java
 BlueAPI.Items.name(item, "<green>Ready");
 BlueAPI.Items.lore(item, "<gray>Line one", "<yellow>Line two");
+ItemStack copy = BlueAPI.Items.builder(existingItem).name("<green>Copy").build();
 BlueAPI.Items.enchant(item, "sharpness", 1);
 BlueAPI.Items.unbreakable(item, true);
+BlueAPI.Items.customModelData(item, 1001);
+BlueAPI.Items.editMeta(item, meta -> {
+    // Add plugin-specific metadata without leaving the BlueAPI item flow.
+});
+```
+
+If your plugin already has Adventure components after placeholder processing,
+use the component overloads to avoid serializing and parsing text twice:
+
+```java
+BlueAPI.Items.name(item, titleComponent);
+BlueAPI.Items.loreComponents(item, loreComponents);
 ```
 
 ## Text and messages

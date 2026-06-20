@@ -2,6 +2,7 @@ package net.blueva.api.items;
 
 import net.blueva.api.materials.Materials;
 import net.blueva.api.text.Text;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Color;
 import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
@@ -25,6 +26,10 @@ public class Items {
 
     public static Builder builder(Material material) {
         return new Builder(material);
+    }
+
+    public static Builder builder(ItemStack item) {
+        return new Builder(item);
     }
 
     public static Builder builder(String... materialNames) {
@@ -62,10 +67,14 @@ public class Items {
     }
 
     public static ItemStack name(ItemStack item, String name) {
+        return name(item, isBlank(name) ? null : Text.component(name));
+    }
+
+    public static ItemStack name(ItemStack item, Component name) {
         return editMeta(item, new MetaEditor() {
             @Override
             public void edit(ItemMeta meta) {
-                meta.setDisplayName(isBlank(name) ? null : Text.legacySection(name));
+                meta.setDisplayName(name == null ? null : Text.legacySection(name));
             }
         });
     }
@@ -75,22 +84,45 @@ public class Items {
     }
 
     public static ItemStack lore(ItemStack item, Collection<String> lore) {
+        return setLegacyLore(item, legacyLines(lore));
+    }
+
+    public static ItemStack loreComponents(ItemStack item, Component... lore) {
+        return loreComponents(item, lore == null ? null : Arrays.asList(lore));
+    }
+
+    public static ItemStack loreComponents(ItemStack item, Collection<? extends Component> lore) {
+        return setLegacyLore(item, legacyComponentLines(lore));
+    }
+
+    private static ItemStack setLegacyLore(ItemStack item, final List<String> lore) {
         return editMeta(item, new MetaEditor() {
             @Override
             public void edit(ItemMeta meta) {
-                meta.setLore(legacyLines(lore));
+                meta.setLore(lore);
             }
         });
     }
 
     public static ItemStack addLore(ItemStack item, String... lines) {
+        return addLegacyLore(item, legacyLines(lines == null ? null : Arrays.asList(lines)));
+    }
+
+    public static ItemStack addLoreComponents(ItemStack item, Component... lines) {
+        return addLoreComponents(item, lines == null ? null : Arrays.asList(lines));
+    }
+
+    public static ItemStack addLoreComponents(ItemStack item, Collection<? extends Component> lines) {
+        return addLegacyLore(item, legacyComponentLines(lines));
+    }
+
+    private static ItemStack addLegacyLore(ItemStack item, final List<String> lines) {
         return editMeta(item, new MetaEditor() {
             @Override
             public void edit(ItemMeta meta) {
                 List<String> lore = meta.hasLore() && meta.getLore() != null ? new ArrayList<>(meta.getLore()) : new ArrayList<String>();
-                List<String> extra = legacyLines(lines == null ? null : Arrays.asList(lines));
-                if (extra != null) {
-                    lore.addAll(extra);
+                if (lines != null) {
+                    lore.addAll(lines);
                 }
                 meta.setLore(lore.isEmpty() ? null : lore);
             }
@@ -157,6 +189,23 @@ public class Items {
         });
     }
 
+    public static ItemStack customModelData(ItemStack item, final int data) {
+        return customModelData(item, Integer.valueOf(data));
+    }
+
+    public static ItemStack clearCustomModelData(ItemStack item) {
+        return customModelData(item, null);
+    }
+
+    public static ItemStack customModelData(ItemStack item, final Integer data) {
+        return editMeta(item, new MetaEditor() {
+            @Override
+            public void edit(ItemMeta meta) {
+                setCustomModelData(meta, data);
+            }
+        });
+    }
+
     public static ItemStack skullOwner(ItemStack item, String owner) {
         return editMeta(item, new MetaEditor() {
             @Override
@@ -209,7 +258,7 @@ public class Items {
         }
     }
 
-    private static ItemStack editMeta(ItemStack item, MetaEditor editor) {
+    public static ItemStack editMeta(ItemStack item, MetaEditor editor) {
         if (item == null || editor == null) {
             return item;
         }
@@ -222,12 +271,36 @@ public class Items {
         return item;
     }
 
+    public static ItemStack editMeta(ItemStack item, TypedMetaEditor<? extends ItemMeta> editor) {
+        if (item == null || editor == null) {
+            return item;
+        }
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null || !editor.type().isInstance(meta)) {
+            return item;
+        }
+        editTypedMeta(meta, editor);
+        item.setItemMeta(meta);
+        return item;
+    }
+
     private static List<String> legacyLines(Collection<String> lines) {
         if (lines == null) {
             return null;
         }
         List<String> legacy = new ArrayList<>();
         for (String line : lines) {
+            legacy.add(Text.legacySection(line));
+        }
+        return legacy;
+    }
+
+    private static List<String> legacyComponentLines(Collection<? extends Component> lines) {
+        if (lines == null) {
+            return null;
+        }
+        List<String> legacy = new ArrayList<>();
+        for (Component line : lines) {
             legacy.add(Text.legacySection(line));
         }
         return legacy;
@@ -260,6 +333,14 @@ public class Items {
         }
     }
 
+    private static void setCustomModelData(ItemMeta meta, Integer data) {
+        try {
+            Method method = meta.getClass().getMethod("setCustomModelData", Integer.class);
+            method.invoke(meta, data);
+        } catch (Throwable ignored) {
+        }
+    }
+
     private static String modernToLegacyEnchantment(String normalized) {
         if ("SHARPNESS".equals(normalized)) return "DAMAGE_ALL";
         if ("SMITE".equals(normalized)) return "DAMAGE_UNDEAD";
@@ -286,8 +367,19 @@ public class Items {
         return value == null || value.trim().isEmpty();
     }
 
-    private interface MetaEditor {
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void editTypedMeta(ItemMeta meta, TypedMetaEditor editor) {
+        editor.edit(meta);
+    }
+
+    public interface MetaEditor {
         void edit(ItemMeta meta);
+    }
+
+    public interface TypedMetaEditor<T extends ItemMeta> {
+        Class<T> type();
+
+        void edit(T meta);
     }
 
     public static class Builder {
@@ -327,6 +419,11 @@ public class Items {
             return this;
         }
 
+        public Builder name(Component name) {
+            Items.name(item, name);
+            return this;
+        }
+
         public Builder lore(String... lore) {
             Items.lore(item, lore);
             return this;
@@ -337,8 +434,28 @@ public class Items {
             return this;
         }
 
+        public Builder loreComponents(Component... lore) {
+            Items.loreComponents(item, lore);
+            return this;
+        }
+
+        public Builder loreComponents(Collection<? extends Component> lore) {
+            Items.loreComponents(item, lore);
+            return this;
+        }
+
         public Builder addLore(String... lines) {
             Items.addLore(item, lines);
+            return this;
+        }
+
+        public Builder addLoreComponents(Component... lines) {
+            Items.addLoreComponents(item, lines);
+            return this;
+        }
+
+        public Builder addLoreComponents(Collection<? extends Component> lines) {
+            Items.addLoreComponents(item, lines);
             return this;
         }
 
@@ -376,6 +493,16 @@ public class Items {
             return this;
         }
 
+        public Builder customModelData(int data) {
+            Items.customModelData(item, data);
+            return this;
+        }
+
+        public Builder clearCustomModelData() {
+            Items.clearCustomModelData(item);
+            return this;
+        }
+
         public Builder skullOwner(String owner) {
             Items.skullOwner(item, owner);
             return this;
@@ -383,6 +510,16 @@ public class Items {
 
         public Builder leatherColor(Color color) {
             Items.leatherColor(item, color);
+            return this;
+        }
+
+        public Builder meta(MetaEditor editor) {
+            Items.editMeta(item, editor);
+            return this;
+        }
+
+        public Builder typedMeta(TypedMetaEditor<? extends ItemMeta> editor) {
+            Items.editMeta(item, editor);
             return this;
         }
 
