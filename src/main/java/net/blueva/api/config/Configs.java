@@ -57,6 +57,18 @@ public class Configs {
         }
     }
 
+    public static ConfigRegistry registry(Path dataFolder, ClassLoader classLoader, String resourcePrefix, ConfigFormat format) {
+        return new ConfigRegistry(dataFolder, classLoader, resourcePrefix, format);
+    }
+
+    public static ConfigRegistry yamlRegistry(Path dataFolder, ClassLoader classLoader, String resourcePrefix) {
+        return registry(dataFolder, classLoader, resourcePrefix, ConfigFormat.YAML);
+    }
+
+    public static ConfigRegistry tomlRegistry(Path dataFolder, ClassLoader classLoader, String resourcePrefix) {
+        return registry(dataFolder, classLoader, resourcePrefix, ConfigFormat.TOML);
+    }
+
     public static ConfigDocument parse(String text, ConfigFormat format) {
         return ConfigCodecs.of(format).read(text);
     }

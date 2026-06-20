@@ -316,6 +316,24 @@ config.inlineComment("features.mode", "Used only when no arena overrides it.");
 config.save();
 ```
 
+Multiple file registry:
+
+```java
+ConfigRegistry configs = BlueAPI.Configs.yamlRegistry(
+        getDataFolder().toPath().resolve("modules/my-module"),
+        moduleClassLoader,
+        "files/"
+);
+
+configs.register("settings.yml");
+configs.registerCopyOnly("kits.yml");
+
+boolean enabled = configs.getBoolean("settings.yml", "features.enabled", true);
+List<String> kits = configs.getStringList("kits.yml", "kits.default.items");
+configs.set("settings.yml", "features.enabled", false);
+configs.save("settings.yml");
+```
+
 Example YAML default:
 
 ```yaml
