@@ -3,6 +3,7 @@ package net.blueva.api.items;
 import net.blueva.api.materials.Materials;
 import net.blueva.api.text.Text;
 import net.kyori.adventure.text.Component;
+import org.bukkit.Bukkit;
 import org.bukkit.Color;
 import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
@@ -12,11 +13,17 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.UUID;
+import java.util.Base64;
 
 /** Multi-version item helpers. Text input is MiniMessage-first. */
 public class Items {
@@ -87,6 +94,18 @@ public class Items {
         return setLegacyLore(item, legacyLines(lore));
     }
 
+    public static ItemStack loreSplit(ItemStack item, String... lore) {
+        return loreSplit(item, lore == null ? null : Arrays.asList(lore));
+    }
+
+    public static ItemStack loreSplit(ItemStack item, Collection<String> lore) {
+        return loreSplit(item, lore, false);
+    }
+
+    public static ItemStack loreSplit(ItemStack item, Collection<String> lore, boolean keepEmptyLines) {
+        return setLegacyLore(item, legacyLines(splitLines(lore, keepEmptyLines)));
+    }
+
     public static ItemStack loreComponents(ItemStack item, Component... lore) {
         return loreComponents(item, lore == null ? null : Arrays.asList(lore));
     }
@@ -106,6 +125,18 @@ public class Items {
 
     public static ItemStack addLore(ItemStack item, String... lines) {
         return addLegacyLore(item, legacyLines(lines == null ? null : Arrays.asList(lines)));
+    }
+
+    public static ItemStack addLoreSplit(ItemStack item, String... lines) {
+        return addLoreSplit(item, lines == null ? null : Arrays.asList(lines));
+    }
+
+    public static ItemStack addLoreSplit(ItemStack item, Collection<String> lines) {
+        return addLoreSplit(item, lines, false);
+    }
+
+    public static ItemStack addLoreSplit(ItemStack item, Collection<String> lines, boolean keepEmptyLines) {
+        return addLegacyLore(item, legacyLines(splitLines(lines, keepEmptyLines)));
     }
 
     public static ItemStack addLoreComponents(ItemStack item, Component... lines) {
@@ -217,6 +248,27 @@ public class Items {
         });
     }
 
+    public static ItemStack skullTexture(ItemStack item, final String texture) {
+        return editMeta(item, new TypedMetaEditor<SkullMeta>() {
+            @Override
+            public Class<SkullMeta> type() {
+                return SkullMeta.class;
+            }
+
+            @Override
+            public void edit(SkullMeta meta) {
+                applySkullTexture(meta, texture);
+            }
+        });
+    }
+
+    public static ItemStack skullValue(ItemStack item, String value) {
+        if (isMinecraftPlayerName(value)) {
+            return skullOwner(item, value);
+        }
+        return skullTexture(item, value);
+    }
+
     public static ItemStack leatherColor(ItemStack item, Color color) {
         return editMeta(item, new MetaEditor() {
             @Override
@@ -284,6 +336,78 @@ public class Items {
         return item;
     }
 
+    public static ItemStack pdcString(ItemStack item, String namespace, String key, String value) {
+        return setPdc(item, namespace, key, "STRING", value);
+    }
+
+    public static String pdcString(ItemStack item, String namespace, String key) {
+        Object value = getPdc(item, namespace, key, "STRING");
+        return value instanceof String ? (String) value : null;
+    }
+
+    public static ItemStack pdcInt(ItemStack item, String namespace, String key, int value) {
+        return setPdc(item, namespace, key, "INTEGER", Integer.valueOf(value));
+    }
+
+    public static Integer pdcInt(ItemStack item, String namespace, String key) {
+        Object value = getPdc(item, namespace, key, "INTEGER");
+        return value instanceof Integer ? (Integer) value : null;
+    }
+
+    public static ItemStack pdcBoolean(ItemStack item, String namespace, String key, boolean value) {
+        return setPdc(item, namespace, key, "BYTE", Byte.valueOf((byte) (value ? 1 : 0)));
+    }
+
+    public static Boolean pdcBoolean(ItemStack item, String namespace, String key) {
+        Object value = getPdc(item, namespace, key, "BYTE");
+        return value instanceof Byte ? Boolean.valueOf(((Byte) value).byteValue() != 0) : null;
+    }
+
+    public static boolean pdcHas(ItemStack item, String namespace, String key, String typeName) {
+        ItemMeta meta = item == null ? null : safeMeta(item);
+        if (meta == null) {
+            return false;
+        }
+        try {
+            PdcContext context = pdcContext(meta, namespace, key, typeName);
+            if (context == null) {
+                return false;
+            }
+            try {
+                Method has = context.container.getClass().getMethod("has", context.key.getClass(), context.type.getClass());
+                Object result = has.invoke(context.container, context.key, context.type);
+                return result instanceof Boolean && (Boolean) result;
+            } catch (NoSuchMethodException ignored) {
+                Method has = context.container.getClass().getMethod("has", context.key.getClass());
+                Object result = has.invoke(context.container, context.key);
+                return result instanceof Boolean && (Boolean) result;
+            }
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    public static ItemStack pdcRemove(ItemStack item, String namespace, String key) {
+        if (item == null) {
+            return null;
+        }
+        ItemMeta meta = safeMeta(item);
+        if (meta == null) {
+            return item;
+        }
+        try {
+            PdcContext context = pdcContext(meta, namespace, key, "STRING");
+            if (context == null) {
+                return item;
+            }
+            Method remove = context.container.getClass().getMethod("remove", context.key.getClass());
+            remove.invoke(context.container, context.key);
+            item.setItemMeta(meta);
+        } catch (Throwable ignored) {
+        }
+        return item;
+    }
+
     private static List<String> legacyLines(Collection<String> lines) {
         if (lines == null) {
             return null;
@@ -293,6 +417,25 @@ public class Items {
             legacy.add(Text.legacySection(line));
         }
         return legacy;
+    }
+
+    private static List<String> splitLines(Collection<String> lines, boolean keepEmptyLines) {
+        if (lines == null) {
+            return null;
+        }
+        List<String> split = new ArrayList<>();
+        for (String line : lines) {
+            if (line == null) {
+                continue;
+            }
+            String[] parts = line.split("\\n", -1);
+            for (String part : parts) {
+                if (keepEmptyLines || !part.isEmpty()) {
+                    split.add(part);
+                }
+            }
+        }
+        return split;
     }
 
     private static List<String> legacyComponentLines(Collection<? extends Component> lines) {
@@ -341,6 +484,249 @@ public class Items {
         }
     }
 
+    private static ItemStack setPdc(ItemStack item, String namespace, String key, String typeName, Object value) {
+        if (item == null) {
+            return null;
+        }
+        if (value == null) {
+            return pdcRemove(item, namespace, key);
+        }
+        ItemMeta meta = safeMeta(item);
+        if (meta == null) {
+            return item;
+        }
+        try {
+            PdcContext context = pdcContext(meta, namespace, key, typeName);
+            if (context == null) {
+                return item;
+            }
+            Method set = context.container.getClass().getMethod("set", context.key.getClass(), context.type.getClass(), Object.class);
+            set.invoke(context.container, context.key, context.type, value);
+            item.setItemMeta(meta);
+        } catch (Throwable ignored) {
+        }
+        return item;
+    }
+
+    private static Object getPdc(ItemStack item, String namespace, String key, String typeName) {
+        ItemMeta meta = item == null ? null : safeMeta(item);
+        if (meta == null) {
+            return null;
+        }
+        try {
+            PdcContext context = pdcContext(meta, namespace, key, typeName);
+            if (context == null) {
+                return null;
+            }
+            Method get = context.container.getClass().getMethod("get", context.key.getClass(), context.type.getClass());
+            return get.invoke(context.container, context.key, context.type);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static PdcContext pdcContext(ItemMeta meta, String namespace, String key, String typeName) {
+        if (meta == null || isBlank(namespace) || isBlank(key) || isBlank(typeName)) {
+            return null;
+        }
+        try {
+            Method containerGetter = meta.getClass().getMethod("getPersistentDataContainer");
+            Object container = containerGetter.invoke(meta);
+            if (container == null) {
+                return null;
+            }
+            Class<?> namespacedKeyClass = Class.forName("org.bukkit.NamespacedKey");
+            Object namespacedKey = namespacedKey(namespacedKeyClass, namespace, key);
+            if (namespacedKey == null) {
+                return null;
+            }
+            Class<?> typeClass = Class.forName("org.bukkit.persistence.PersistentDataType");
+            Object type = typeClass.getField(typeName.trim().toUpperCase()).get(null);
+            return new PdcContext(container, namespacedKey, type);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static Object namespacedKey(Class<?> namespacedKeyClass, String namespace, String key) {
+        try {
+            if ("minecraft".equalsIgnoreCase(namespace)) {
+                try {
+                    Method minecraft = namespacedKeyClass.getMethod("minecraft", String.class);
+                    return minecraft.invoke(null, key);
+                } catch (Throwable ignored) {
+                }
+            }
+            Constructor<?> constructor = namespacedKeyClass.getConstructor(String.class, String.class);
+            return constructor.newInstance(namespace, key);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static ItemMeta safeMeta(ItemStack item) {
+        try {
+            return item == null ? null : item.getItemMeta();
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static boolean applySkullTexture(SkullMeta meta, String value) {
+        if (meta == null || isBlank(value)) {
+            return false;
+        }
+        return applySkullTextureProfile(meta, value) || applySkullTextureProperty(meta, value);
+    }
+
+    private static boolean applySkullTextureProfile(SkullMeta meta, String value) {
+        String textureUrl = textureUrl(value);
+        if (isBlank(textureUrl)) {
+            return false;
+        }
+        try {
+            Method creator = Bukkit.class.getMethod("createPlayerProfile", UUID.class);
+            Object profile = creator.invoke(null, UUID.randomUUID());
+            Object textures = profile.getClass().getMethod("getTextures").invoke(profile);
+            Method setSkin = textures.getClass().getMethod("setSkin", URL.class);
+            setSkin.invoke(textures, new URL(textureUrl));
+            profile.getClass().getMethod("setTextures", textures.getClass()).invoke(profile, textures);
+            return applyProfile(meta, profile);
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static boolean applySkullTextureProperty(SkullMeta meta, String value) {
+        String texture = textureProperty(value);
+        if (isBlank(texture)) {
+            return false;
+        }
+        try {
+            Class<?> gameProfileClass = Class.forName("com.mojang.authlib.GameProfile");
+            Object profile = gameProfileClass.getConstructor(UUID.class, String.class).newInstance(UUID.randomUUID(), "");
+            Object properties = gameProfileClass.getMethod("getProperties").invoke(profile);
+            Class<?> propertyClass = Class.forName("com.mojang.authlib.properties.Property");
+            Object property = propertyClass.getConstructor(String.class, String.class).newInstance("textures", texture);
+            properties.getClass().getMethod("put", Object.class, Object.class).invoke(properties, "textures", property);
+            if (applyProfile(meta, profile)) {
+                return true;
+            }
+            Field field = findField(meta.getClass(), "profile");
+            if (field == null) {
+                return false;
+            }
+            field.setAccessible(true);
+            field.set(meta, profile);
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static boolean applyProfile(SkullMeta meta, Object profile) {
+        if (meta == null || profile == null) {
+            return false;
+        }
+        try {
+            Method setter = findCompatibleMethod(meta.getClass(), "setOwnerProfile", profile.getClass());
+            if (setter == null) {
+                setter = findCompatibleMethod(meta.getClass(), "setPlayerProfile", profile.getClass());
+            }
+            if (setter == null) {
+                return false;
+            }
+            setter.setAccessible(true);
+            setter.invoke(meta, profile);
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static Method findCompatibleMethod(Class<?> type, String name, Class<?> argumentType) {
+        for (Method method : type.getMethods()) {
+            if (!method.getName().equals(name) || method.getParameterTypes().length != 1) {
+                continue;
+            }
+            if (method.getParameterTypes()[0].isAssignableFrom(argumentType)) {
+                return method;
+            }
+        }
+        return null;
+    }
+
+    private static Field findField(Class<?> type, String name) {
+        Class<?> current = type;
+        while (current != null) {
+            try {
+                return current.getDeclaredField(name);
+            } catch (NoSuchFieldException ignored) {
+                current = current.getSuperclass();
+            }
+        }
+        return null;
+    }
+
+    private static String textureUrl(String value) {
+        if (isBlank(value)) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+            return trimmed;
+        }
+        String decoded = extractTextureUrl(trimmed);
+        if (!isBlank(decoded)) {
+            return decoded;
+        }
+        if (trimmed.length() >= 32 && trimmed.matches("^[a-fA-F0-9]+$")) {
+            return "http://textures.minecraft.net/texture/" + trimmed;
+        }
+        return null;
+    }
+
+    private static String textureProperty(String value) {
+        if (isBlank(value)) {
+            return null;
+        }
+        String trimmed = value.trim();
+        String decoded = extractTextureUrl(trimmed);
+        if (!isBlank(decoded)) {
+            return trimmed;
+        }
+        String url = textureUrl(trimmed);
+        if (isBlank(url)) {
+            return trimmed;
+        }
+        String json = "{\"textures\":{\"SKIN\":{\"url\":\"" + url + "\"}}}";
+        return Base64.getEncoder().encodeToString(json.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static String extractTextureUrl(String value) {
+        try {
+            String json = new String(Base64.getDecoder().decode(value), StandardCharsets.UTF_8);
+            String marker = "\"url\"";
+            int markerIndex = json.indexOf(marker);
+            if (markerIndex < 0) {
+                return null;
+            }
+            int colonIndex = json.indexOf(':', markerIndex + marker.length());
+            int firstQuote = json.indexOf('"', colonIndex + 1);
+            int secondQuote = json.indexOf('"', firstQuote + 1);
+            if (colonIndex < 0 || firstQuote < 0 || secondQuote < 0) {
+                return null;
+            }
+            return json.substring(firstQuote + 1, secondQuote);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static boolean isMinecraftPlayerName(String value) {
+        return value != null && value.length() >= 3 && value.length() <= 16 && value.matches("^[a-zA-Z0-9_]+$");
+    }
+
     private static String modernToLegacyEnchantment(String normalized) {
         if ("SHARPNESS".equals(normalized)) return "DAMAGE_ALL";
         if ("SMITE".equals(normalized)) return "DAMAGE_UNDEAD";
@@ -380,6 +766,18 @@ public class Items {
         Class<T> type();
 
         void edit(T meta);
+    }
+
+    private static final class PdcContext {
+        private final Object container;
+        private final Object key;
+        private final Object type;
+
+        private PdcContext(Object container, Object key, Object type) {
+            this.container = container;
+            this.key = key;
+            this.type = type;
+        }
     }
 
     public static class Builder {
@@ -434,6 +832,21 @@ public class Items {
             return this;
         }
 
+        public Builder loreSplit(String... lore) {
+            Items.loreSplit(item, lore);
+            return this;
+        }
+
+        public Builder loreSplit(Collection<String> lore) {
+            Items.loreSplit(item, lore);
+            return this;
+        }
+
+        public Builder loreSplit(Collection<String> lore, boolean keepEmptyLines) {
+            Items.loreSplit(item, lore, keepEmptyLines);
+            return this;
+        }
+
         public Builder loreComponents(Component... lore) {
             Items.loreComponents(item, lore);
             return this;
@@ -446,6 +859,21 @@ public class Items {
 
         public Builder addLore(String... lines) {
             Items.addLore(item, lines);
+            return this;
+        }
+
+        public Builder addLoreSplit(String... lines) {
+            Items.addLoreSplit(item, lines);
+            return this;
+        }
+
+        public Builder addLoreSplit(Collection<String> lines) {
+            Items.addLoreSplit(item, lines);
+            return this;
+        }
+
+        public Builder addLoreSplit(Collection<String> lines, boolean keepEmptyLines) {
+            Items.addLoreSplit(item, lines, keepEmptyLines);
             return this;
         }
 
@@ -508,8 +936,38 @@ public class Items {
             return this;
         }
 
+        public Builder skullTexture(String texture) {
+            Items.skullTexture(item, texture);
+            return this;
+        }
+
+        public Builder skullValue(String value) {
+            Items.skullValue(item, value);
+            return this;
+        }
+
         public Builder leatherColor(Color color) {
             Items.leatherColor(item, color);
+            return this;
+        }
+
+        public Builder pdcString(String namespace, String key, String value) {
+            Items.pdcString(item, namespace, key, value);
+            return this;
+        }
+
+        public Builder pdcInt(String namespace, String key, int value) {
+            Items.pdcInt(item, namespace, key, value);
+            return this;
+        }
+
+        public Builder pdcBoolean(String namespace, String key, boolean value) {
+            Items.pdcBoolean(item, namespace, key, value);
+            return this;
+        }
+
+        public Builder pdcRemove(String namespace, String key) {
+            Items.pdcRemove(item, namespace, key);
             return this;
         }
 

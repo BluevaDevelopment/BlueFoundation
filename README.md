@@ -169,6 +169,9 @@ ItemStack copy = BlueAPI.Items.builder(existingItem).name("<green>Copy").build()
 BlueAPI.Items.enchant(item, "sharpness", 1);
 BlueAPI.Items.unbreakable(item, true);
 BlueAPI.Items.customModelData(item, 1001);
+BlueAPI.Items.pdcString(item, "myplugin", "item_id", "selector");
+String itemId = BlueAPI.Items.pdcString(item, "myplugin", "item_id");
+BlueAPI.Items.skullTexture(item, "http://textures.minecraft.net/texture/...");
 BlueAPI.Items.editMeta(item, meta -> {
     // Add plugin-specific metadata without leaving the BlueAPI item flow.
 });
@@ -180,6 +183,7 @@ use the component overloads to avoid serializing and parsing text twice:
 ```java
 BlueAPI.Items.name(item, titleComponent);
 BlueAPI.Items.loreComponents(item, loreComponents);
+BlueAPI.Items.loreSplit(item, "<gray>Line one\n<yellow>Line two");
 ```
 
 ## Text and messages
