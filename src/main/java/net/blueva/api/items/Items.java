@@ -353,8 +353,17 @@ public class Items {
         return setPdc(item, namespace, key, "STRING", value);
     }
 
+    public static ItemStack pdcString(ItemStack item, Object namespacedKey, String value) {
+        return setPdc(item, namespacedKey, "STRING", value);
+    }
+
     public static String pdcString(ItemStack item, String namespace, String key) {
         Object value = getPdc(item, namespace, key, "STRING");
+        return value instanceof String ? (String) value : null;
+    }
+
+    public static String pdcString(ItemStack item, Object namespacedKey) {
+        Object value = getPdc(item, namespacedKey, "STRING");
         return value instanceof String ? (String) value : null;
     }
 
@@ -362,8 +371,17 @@ public class Items {
         return setPdc(item, namespace, key, "INTEGER", Integer.valueOf(value));
     }
 
+    public static ItemStack pdcInt(ItemStack item, Object namespacedKey, int value) {
+        return setPdc(item, namespacedKey, "INTEGER", Integer.valueOf(value));
+    }
+
     public static Integer pdcInt(ItemStack item, String namespace, String key) {
         Object value = getPdc(item, namespace, key, "INTEGER");
+        return value instanceof Integer ? (Integer) value : null;
+    }
+
+    public static Integer pdcInt(ItemStack item, Object namespacedKey) {
+        Object value = getPdc(item, namespacedKey, "INTEGER");
         return value instanceof Integer ? (Integer) value : null;
     }
 
@@ -377,30 +395,42 @@ public class Items {
     }
 
     public static boolean pdcHas(ItemStack item, String namespace, String key, String typeName) {
+        return pdcHas(item, namespacedKey(namespace, key), typeName);
+    }
+
+    public static boolean pdcHas(ItemStack item, Object namespacedKey, String typeName) {
         ItemMeta meta = item == null ? null : safeMeta(item);
         if (meta == null) {
             return false;
         }
         try {
-            PdcContext context = pdcContext(meta, namespace, key, typeName);
-            if (context == null) {
-                return false;
-            }
-            try {
-                Method has = context.container.getClass().getMethod("has", context.key.getClass(), context.type.getClass());
+            PdcContext context = pdcContext(meta, namespacedKey, typeName);
+            if (context != null) {
+                try {
+                    Method has = context.containerClass.getMethod("has", context.keyClass, context.typeClass);
                 Object result = has.invoke(context.container, context.key, context.type);
-                return result instanceof Boolean && (Boolean) result;
+                if (result instanceof Boolean && (Boolean) result) {
+                    return true;
+                }
             } catch (NoSuchMethodException ignored) {
-                Method has = context.container.getClass().getMethod("has", context.key.getClass());
-                Object result = has.invoke(context.container, context.key);
-                return result instanceof Boolean && (Boolean) result;
+                    Method has = context.containerClass.getMethod("has", context.keyClass);
+                    Object result = has.invoke(context.container, context.key);
+                    if (result instanceof Boolean && (Boolean) result) {
+                        return true;
+                    }
+                }
             }
         } catch (Throwable ignored) {
-            return false;
         }
+        return customItemTagHas(meta, namespacedKey, typeName);
     }
 
     public static ItemStack pdcRemove(ItemStack item, String namespace, String key) {
+        Object namespacedKey = namespacedKey(namespace, key);
+        return pdcRemove(item, namespacedKey);
+    }
+
+    public static ItemStack pdcRemove(ItemStack item, Object namespacedKey) {
         if (item == null) {
             return null;
         }
@@ -409,15 +439,15 @@ public class Items {
             return item;
         }
         try {
-            PdcContext context = pdcContext(meta, namespace, key, "STRING");
-            if (context == null) {
-                return item;
+            PdcContext context = pdcContext(meta, namespacedKey, "STRING");
+            if (context != null) {
+                Method remove = context.containerClass.getMethod("remove", context.keyClass);
+                remove.invoke(context.container, context.key);
             }
-            Method remove = context.container.getClass().getMethod("remove", context.key.getClass());
-            remove.invoke(context.container, context.key);
-            item.setItemMeta(meta);
         } catch (Throwable ignored) {
         }
+        customItemTagRemove(meta, namespacedKey);
+        item.setItemMeta(meta);
         return item;
     }
 
@@ -498,48 +528,58 @@ public class Items {
     }
 
     private static ItemStack setPdc(ItemStack item, String namespace, String key, String typeName, Object value) {
+        return setPdc(item, namespacedKey(namespace, key), typeName, value);
+    }
+
+    private static ItemStack setPdc(ItemStack item, Object namespacedKey, String typeName, Object value) {
         if (item == null) {
             return null;
         }
         if (value == null) {
-            return pdcRemove(item, namespace, key);
+            return pdcRemove(item, namespacedKey);
         }
         ItemMeta meta = safeMeta(item);
         if (meta == null) {
             return item;
         }
         try {
-            PdcContext context = pdcContext(meta, namespace, key, typeName);
-            if (context == null) {
-                return item;
+            PdcContext context = pdcContext(meta, namespacedKey, typeName);
+            if (context != null) {
+                Method set = context.containerClass.getMethod("set", context.keyClass, context.typeClass, Object.class);
+                set.invoke(context.container, context.key, context.type, value);
             }
-            Method set = context.container.getClass().getMethod("set", context.key.getClass(), context.type.getClass(), Object.class);
-            set.invoke(context.container, context.key, context.type, value);
-            item.setItemMeta(meta);
         } catch (Throwable ignored) {
         }
+        customItemTagSet(meta, namespacedKey, typeName, value);
+        item.setItemMeta(meta);
         return item;
     }
 
     private static Object getPdc(ItemStack item, String namespace, String key, String typeName) {
+        return getPdc(item, namespacedKey(namespace, key), typeName);
+    }
+
+    private static Object getPdc(ItemStack item, Object namespacedKey, String typeName) {
         ItemMeta meta = item == null ? null : safeMeta(item);
         if (meta == null) {
             return null;
         }
         try {
-            PdcContext context = pdcContext(meta, namespace, key, typeName);
-            if (context == null) {
-                return null;
+            PdcContext context = pdcContext(meta, namespacedKey, typeName);
+            if (context != null) {
+                Method get = context.containerClass.getMethod("get", context.keyClass, context.typeClass);
+                Object value = get.invoke(context.container, context.key, context.type);
+                if (value != null) {
+                    return value;
+                }
             }
-            Method get = context.container.getClass().getMethod("get", context.key.getClass(), context.type.getClass());
-            return get.invoke(context.container, context.key, context.type);
         } catch (Throwable ignored) {
-            return null;
         }
+        return customItemTagGet(meta, namespacedKey, typeName);
     }
 
-    private static PdcContext pdcContext(ItemMeta meta, String namespace, String key, String typeName) {
-        if (meta == null || isBlank(namespace) || isBlank(key) || isBlank(typeName)) {
+    private static PdcContext pdcContext(ItemMeta meta, Object namespacedKey, String typeName) {
+        if (meta == null || namespacedKey == null || isBlank(typeName)) {
             return null;
         }
         try {
@@ -549,13 +589,134 @@ public class Items {
                 return null;
             }
             Class<?> namespacedKeyClass = Class.forName("org.bukkit.NamespacedKey");
-            Object namespacedKey = namespacedKey(namespacedKeyClass, namespace, key);
-            if (namespacedKey == null) {
+            if (!namespacedKeyClass.isInstance(namespacedKey)) {
                 return null;
             }
             Class<?> typeClass = Class.forName("org.bukkit.persistence.PersistentDataType");
             Object type = typeClass.getField(typeName.trim().toUpperCase()).get(null);
-            return new PdcContext(container, namespacedKey, type);
+            Class<?> containerClass = Class.forName("org.bukkit.persistence.PersistentDataContainer");
+            if (!containerClass.isInstance(container)) {
+                return null;
+            }
+            return new PdcContext(container, namespacedKey, type, namespacedKeyClass, typeClass, containerClass);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+
+    private static boolean customItemTagSet(ItemMeta meta, Object namespacedKey, String typeName, Object value) {
+        try {
+            CustomItemTagContext context = customItemTagContext(meta, namespacedKey, typeName);
+            if (context == null) {
+                return false;
+            }
+            Method set = context.containerClass.getMethod("setCustomTag", context.keyClass, context.typeClass, Object.class);
+            set.invoke(context.container, context.key, context.type, value);
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static Object customItemTagGet(ItemMeta meta, Object namespacedKey, String typeName) {
+        try {
+            CustomItemTagContext context = customItemTagContext(meta, namespacedKey, typeName);
+            if (context == null) {
+                return null;
+            }
+            Method get = context.containerClass.getMethod("getCustomTag", context.keyClass, context.typeClass);
+            return get.invoke(context.container, context.key, context.type);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static boolean customItemTagHas(ItemMeta meta, Object namespacedKey, String typeName) {
+        try {
+            CustomItemTagContext context = customItemTagContext(meta, namespacedKey, typeName);
+            if (context == null) {
+                return false;
+            }
+            Method has = context.containerClass.getMethod("hasCustomTag", context.keyClass, context.typeClass);
+            Object result = has.invoke(context.container, context.key, context.type);
+            return result instanceof Boolean && (Boolean) result;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static boolean customItemTagRemove(ItemMeta meta, Object namespacedKey) {
+        try {
+            CustomItemTagContext context = customItemTagContext(meta, namespacedKey, "STRING");
+            if (context == null) {
+                return false;
+            }
+            Method remove = context.containerClass.getMethod("removeCustomTag", context.keyClass);
+            remove.invoke(context.container, context.key);
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static CustomItemTagContext customItemTagContext(ItemMeta meta, Object namespacedKey, String typeName) {
+        if (meta == null || namespacedKey == null || isBlank(typeName)) {
+            return null;
+        }
+        try {
+            Class<?> namespacedKeyClass = Class.forName("org.bukkit.NamespacedKey");
+            if (!namespacedKeyClass.isInstance(namespacedKey)) {
+                return null;
+            }
+            Method containerGetter = meta.getClass().getMethod("getCustomTagContainer");
+            Object container = containerGetter.invoke(meta);
+            if (container == null) {
+                return null;
+            }
+            Class<?> typeClass = Class.forName("org.bukkit.inventory.meta.tags.ItemTagType");
+            Object type = typeClass.getField(typeName.trim().toUpperCase()).get(null);
+            Class<?> containerClass = Class.forName("org.bukkit.inventory.meta.tags.CustomItemTagContainer");
+            if (!containerClass.isInstance(container)) {
+                return null;
+            }
+            return new CustomItemTagContext(container, namespacedKey, type, namespacedKeyClass, typeClass, containerClass);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static Method findMethod(Class<?> owner, String name, Class<?>... parameterTypes) throws NoSuchMethodException {
+        try {
+            return owner.getMethod(name, parameterTypes);
+        } catch (NoSuchMethodException ignored) {
+        }
+        for (Method method : owner.getMethods()) {
+            if (!method.getName().equals(name) || method.getParameterCount() != parameterTypes.length) {
+                continue;
+            }
+            Class<?>[] declaredTypes = method.getParameterTypes();
+            boolean compatible = true;
+            for (int i = 0; i < declaredTypes.length; i++) {
+                if (!declaredTypes[i].isAssignableFrom(parameterTypes[i])) {
+                    compatible = false;
+                    break;
+                }
+            }
+            if (compatible) {
+                return method;
+            }
+        }
+        throw new NoSuchMethodException(owner.getName() + "#" + name);
+    }
+
+    private static Object namespacedKey(String namespace, String key) {
+        if (isBlank(namespace) || isBlank(key)) {
+            return null;
+        }
+        try {
+            Class<?> namespacedKeyClass = Class.forName("org.bukkit.NamespacedKey");
+            return namespacedKey(namespacedKeyClass, namespace, key);
         } catch (Throwable ignored) {
             return null;
         }
@@ -995,11 +1156,37 @@ public class Items {
         private final Object container;
         private final Object key;
         private final Object type;
+        private final Class<?> keyClass;
+        private final Class<?> typeClass;
+        private final Class<?> containerClass;
 
-        private PdcContext(Object container, Object key, Object type) {
+        private PdcContext(Object container, Object key, Object type, Class<?> keyClass, Class<?> typeClass,
+                           Class<?> containerClass) {
             this.container = container;
             this.key = key;
             this.type = type;
+            this.keyClass = keyClass;
+            this.typeClass = typeClass;
+            this.containerClass = containerClass;
+        }
+    }
+
+    private static final class CustomItemTagContext {
+        private final Object container;
+        private final Object key;
+        private final Object type;
+        private final Class<?> keyClass;
+        private final Class<?> typeClass;
+        private final Class<?> containerClass;
+
+        private CustomItemTagContext(Object container, Object key, Object type, Class<?> keyClass, Class<?> typeClass,
+                                     Class<?> containerClass) {
+            this.container = container;
+            this.key = key;
+            this.type = type;
+            this.keyClass = keyClass;
+            this.typeClass = typeClass;
+            this.containerClass = containerClass;
         }
     }
 

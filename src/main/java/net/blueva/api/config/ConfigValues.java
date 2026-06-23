@@ -198,6 +198,12 @@ final class ConfigValues {
         int balance = 0;
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i];
+            if (format == ConfigFormat.YAML && current.length() == 0 && !result.isEmpty()
+                    && shouldContinuePreviousYamlScalar(line, result.get(result.size() - 1))) {
+                int last = result.size() - 1;
+                result.set(last, result.get(last) + " " + line.trim());
+                continue;
+            }
             if (current.length() > 0) {
                 current.append(' ');
             }
@@ -206,7 +212,9 @@ final class ConfigValues {
             if (balance < 0 && format != null) {
                 throw new ConfigParseException(format, i + 1, 1, "Unexpected closing bracket");
             }
-            boolean quoteOpen = hasUnclosedQuote(current.toString());
+            boolean quoteOpen = format == ConfigFormat.YAML
+                    ? hasUnclosedYamlQuotedValue(current.toString())
+                    : hasUnclosedQuoteIgnoringComments(current.toString());
             if (balance <= 0 && !quoteOpen) {
                 result.add(current.toString());
                 current.setLength(0);
@@ -217,12 +225,84 @@ final class ConfigValues {
             throw new ConfigParseException(format, lines.length, 1, "Unclosed inline list or table");
         }
         if (current.length() > 0) {
-            if (format != null && hasUnclosedQuote(current.toString())) {
+            boolean quoteOpen = format == ConfigFormat.YAML
+                    ? hasUnclosedYamlQuotedValue(current.toString())
+                    : hasUnclosedQuoteIgnoringComments(current.toString());
+            if (format != null && quoteOpen) {
                 throw new ConfigParseException(format, lines.length, 1, "Unclosed quoted string");
             }
             result.add(current.toString());
         }
         return result;
+    }
+
+    static boolean hasUnclosedYamlQuotedValue(String line) {
+        if (line == null || line.isEmpty()) {
+            return false;
+        }
+        String trimmed = line.trim();
+        if (trimmed.startsWith("#")) {
+            return false;
+        }
+        String value;
+        if (trimmed.startsWith("- ")) {
+            value = trimmed.substring(2).trim();
+        } else {
+            int colon = separatorIndex(line, ':');
+            if (colon < 0) {
+                return false;
+            }
+            value = line.substring(colon + 1).trim();
+        }
+        int comment = inlineCommentIndex(value);
+        if (comment >= 0) {
+            value = value.substring(0, comment).trim();
+        }
+        if (value.isEmpty()) {
+            return false;
+        }
+        char first = value.charAt(0);
+        if (first != '\'' && first != '"') {
+            return false;
+        }
+        return hasUnclosedQuote(value);
+    }
+
+    private static boolean shouldContinuePreviousYamlScalar(String line, String previous) {
+        if (line == null || previous == null) {
+            return false;
+        }
+        String trimmed = line.trim();
+        if (trimmed.isEmpty() || trimmed.startsWith("#") || trimmed.startsWith("- ")) {
+            return false;
+        }
+        if (separatorIndex(line, ':') >= 0) {
+            return false;
+        }
+        int colon = separatorIndex(previous, ':');
+        if (colon < 0) {
+            return false;
+        }
+        String value = previous.substring(colon + 1).trim();
+        if (value.isEmpty() || value.equals("|") || value.equals(">")
+                || value.endsWith("|") || value.endsWith(">")) {
+            return false;
+        }
+        return trimmed.startsWith("<") || trimmed.startsWith("&") || trimmed.startsWith("§")
+                || trimmed.startsWith("{") || trimmed.startsWith("[");
+    }
+
+    private static boolean hasUnclosedQuoteIgnoringComments(String line) {
+        if (line == null || line.isEmpty()) {
+            return false;
+        }
+        String trimmed = line.trim();
+        if (trimmed.startsWith("#")) {
+            return false;
+        }
+        int comment = inlineCommentIndex(line);
+        String effective = comment >= 0 ? line.substring(0, comment) : line;
+        return hasUnclosedQuote(effective);
     }
 
     static boolean hasUnclosedQuote(String line) {

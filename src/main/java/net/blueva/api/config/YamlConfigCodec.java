@@ -34,12 +34,13 @@ final class YamlConfigCodec implements ConfigCodec {
                 comments.add(trimmed.substring(1).trim());
                 continue;
             }
-            if (ConfigValues.hasUnclosedQuote(line)) {
+            if (ConfigValues.hasUnclosedYamlQuotedValue(line)) {
                 throw error(lineNumber, 1, "Unclosed quoted string");
             }
 
             int indent = indent(line);
-            while (stack.size() > 1 && indent <= stack.get(stack.size() - 1).indent) {
+            boolean legacySameIndentList = isLegacySameIndentList(document, stack, trimmed, indent);
+            while (!legacySameIndentList && stack.size() > 1 && indent <= stack.get(stack.size() - 1).indent) {
                 stack.remove(stack.size() - 1);
             }
 
@@ -203,6 +204,19 @@ final class YamlConfigCodec implements ConfigCodec {
             builder.append(' ');
         }
         return builder;
+    }
+
+
+    private boolean isLegacySameIndentList(ConfigDocument document, List<Frame> stack, String trimmed, int indent) {
+        if (!trimmed.startsWith("- ") || stack.size() <= 1) {
+            return false;
+        }
+        Frame frame = stack.get(stack.size() - 1);
+        if (frame.path.isEmpty() || indent != frame.indent) {
+            return false;
+        }
+        ConfigNode node = document.node(frame.path);
+        return node != null && ((node.getValue() == null && !node.hasChildren()) || node.getValue() instanceof List);
     }
 
     private int indent(String line) {

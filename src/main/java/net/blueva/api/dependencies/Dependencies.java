@@ -87,7 +87,9 @@ public class Dependencies {
             dependencies.add(mavenCentral("net.kyori", "adventure-platform-viaversion", Versions.ADVENTURE_PLATFORM));
             dependencies.add(mavenCentral("net.kyori", "adventure-text-serializer-bungeecord", Versions.ADVENTURE_PLATFORM));
             dependencies.add(mavenCentral("net.kyori", "adventure-text-serializer-gson", adventureVersion));
-            dependencies.add(mavenCentral("net.kyori", "adventure-text-serializer-gson-legacy-impl", adventureVersion));
+            if (!isModernAdventureRuntime()) {
+                dependencies.add(mavenCentral("net.kyori", "adventure-text-serializer-gson-legacy-impl", adventureVersion));
+            }
             dependencies.add(mavenCentral("net.kyori", "adventure-nbt", adventureVersion));
             if (isModernAdventureRuntime()) {
                 dependencies.add(mavenCentral("net.kyori", "adventure-text-serializer-json", adventureVersion));
