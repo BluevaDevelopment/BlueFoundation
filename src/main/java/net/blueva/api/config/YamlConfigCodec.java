@@ -29,13 +29,13 @@ final class YamlConfigCodec implements ConfigCodec {
             if (line.indexOf('\t') >= 0) {
                 throw error(lineNumber, line.indexOf('\t') + 1, "Tabs are not supported for indentation");
             }
-            if (ConfigValues.hasUnclosedQuote(line)) {
-                throw error(lineNumber, 1, "Unclosed quoted string");
-            }
             String trimmed = line.trim();
             if (trimmed.startsWith("#")) {
                 comments.add(trimmed.substring(1).trim());
                 continue;
+            }
+            if (ConfigValues.hasUnclosedQuote(line)) {
+                throw error(lineNumber, 1, "Unclosed quoted string");
             }
 
             int indent = indent(line);
