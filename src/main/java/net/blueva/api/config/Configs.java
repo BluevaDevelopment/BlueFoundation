@@ -7,6 +7,8 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
+import java.util.Set;
 
 /** BlueAPI configuration entry point. */
 public class Configs {
@@ -46,16 +48,79 @@ public class Configs {
         try {
             String defaultText = resource(classLoader, resourceName);
             ConfigDocument defaults = codec.read(defaultText);
-            if (!java.nio.file.Files.exists(file)) {
+            boolean existedBeforeLoad = java.nio.file.Files.exists(file);
+            boolean cacheExistedBeforeLoad = java.nio.file.Files.exists(cache);
+            if (!existedBeforeLoad) {
                 ConfigIO.writeAtomic(file, codec.write(defaults));
             }
             ConfigDocument document = codec.read(ConfigIO.read(file));
-            ConfigFile config = new ConfigFile(file, cache, codec, defaults, document);
+            Set<String> adoptedCustomPaths = existedBeforeLoad && !cacheExistedBeforeLoad
+                    ? changedExistingPaths(document, defaults)
+                    : new HashSet<String>();
+            ConfigFile config = new ConfigFile(file, cache, codec, defaults, document, adoptedCustomPaths);
             config.update();
             return config;
+        } catch (ConfigParseException exception) {
+            throw withSource(exception, file);
         } catch (IOException exception) {
             throw new RuntimeException("Failed to load config " + resourceName, exception);
         }
+    }
+
+
+    public static ConfigFile load(Path file, InputStream defaultInput, ConfigFormat format) {
+        if (file == null) {
+            throw new IllegalArgumentException("file cannot be null");
+        }
+        if (defaultInput == null) {
+            throw new IllegalArgumentException("defaultInput cannot be null");
+        }
+        try {
+            String defaultText;
+            try {
+                defaultText = new String(readAll(defaultInput), StandardCharsets.UTF_8);
+            } finally {
+                defaultInput.close();
+            }
+            return loadFile(file, defaultText, format);
+        } catch (ConfigParseException exception) {
+            throw withSource(exception, file);
+        } catch (IOException exception) {
+            throw new RuntimeException("Failed to load config " + file, exception);
+        }
+    }
+
+    public static ConfigFile load(Path file, ConfigFormat format) {
+        if (file == null) {
+            throw new IllegalArgumentException("file cannot be null");
+        }
+        try {
+            String text = Files.exists(file) ? new String(Files.readAllBytes(file), StandardCharsets.UTF_8) : "";
+            return loadFile(file, text, format);
+        } catch (ConfigParseException exception) {
+            throw withSource(exception, file);
+        } catch (IOException exception) {
+            throw new RuntimeException("Failed to load config " + file, exception);
+        }
+    }
+
+    private static ConfigFile loadFile(Path file, String defaultText, ConfigFormat format) throws IOException {
+        ConfigCodec codec = ConfigCodecs.of(format);
+        Path dataFolder = file.getParent() == null ? java.nio.file.Paths.get("") : file.getParent();
+        Path cache = dataFolder.resolve(".blueapi").resolve("config-cache").resolve(safeCacheName(file.getFileName().toString()));
+        ConfigDocument defaults = codec.read(defaultText);
+        boolean existedBeforeLoad = Files.exists(file);
+        boolean cacheExistedBeforeLoad = Files.exists(cache);
+        if (!existedBeforeLoad) {
+            ConfigIO.writeAtomic(file, codec.write(defaults));
+        }
+        ConfigDocument document = codec.read(ConfigIO.read(file));
+        Set<String> adoptedCustomPaths = existedBeforeLoad && !cacheExistedBeforeLoad
+                ? changedExistingPaths(document, defaults)
+                : new HashSet<String>();
+        ConfigFile config = new ConfigFile(file, cache, codec, defaults, document, adoptedCustomPaths);
+        config.update();
+        return config;
     }
 
     public static ConfigRegistry registry(Path dataFolder, ClassLoader classLoader, String resourcePrefix, ConfigFormat format) {
@@ -80,6 +145,29 @@ public class Configs {
 
     public static String write(ConfigDocument document, ConfigFormat format) {
         return ConfigCodecs.of(format).write(document);
+    }
+
+
+    private static ConfigParseException withSource(ConfigParseException exception, Path file) {
+        return new ConfigParseException(
+                exception.format(),
+                exception.line(),
+                exception.column(),
+                exception.getMessage().substring(exception.getMessage().indexOf(": ") + 2),
+                file == null ? null : file.toString()
+        );
+    }
+
+    private static Set<String> changedExistingPaths(ConfigDocument document, ConfigDocument defaults) {
+        Set<String> changed = new HashSet<String>();
+        for (String path : document.leaves().keySet()) {
+            ConfigNode localNode = document.node(path);
+            ConfigNode defaultNode = defaults.node(path);
+            if (defaultNode == null || !ConfigCache.hash(localNode.getValue()).equals(ConfigCache.hash(defaultNode.getValue()))) {
+                changed.add(path);
+            }
+        }
+        return changed;
     }
 
     private static String resource(ClassLoader classLoader, String resourceName) throws IOException {

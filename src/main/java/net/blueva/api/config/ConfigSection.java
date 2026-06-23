@@ -31,6 +31,10 @@ public final class ConfigSection {
         return document.node(resolve(childPath)) != null;
     }
 
+    public boolean containsKey(String childPath) {
+        return contains(childPath);
+    }
+
     public Object get(String childPath) {
         ConfigNode node = document.node(resolve(childPath));
         return node == null ? null : node.getValue();
@@ -38,6 +42,11 @@ public final class ConfigSection {
 
     public ConfigSection set(String childPath, Object value) {
         document.set(resolve(childPath), value);
+        return this;
+    }
+
+    public ConfigSection remove(String childPath) {
+        document.remove(resolve(childPath));
         return this;
     }
 
@@ -138,9 +147,37 @@ public final class ConfigSection {
         return result;
     }
 
+    public List<String> getStringList(String childPath, List<String> fallback) {
+        List<String> values = getStringList(childPath);
+        return values.isEmpty() ? fallback : values;
+    }
+
+    public List<Integer> getIntList(String childPath) {
+        List<Object> values = getList(childPath);
+        if (values.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<Integer> result = new ArrayList<Integer>();
+        for (Object value : values) {
+            if (value instanceof Number) {
+                result.add(((Number) value).intValue());
+                continue;
+            }
+            try {
+                result.add(Integer.parseInt(String.valueOf(value)));
+            } catch (Exception ignored) {
+            }
+        }
+        return result;
+    }
+
     public ConfigSection section(String childPath) {
         String resolved = resolve(childPath);
         return document.node(resolved) == null ? null : new ConfigSection(document, resolved);
+    }
+
+    public ConfigSection getSection(String childPath) {
+        return section(childPath);
     }
 
     public ConfigSection sectionOrCreate(String childPath) {
@@ -155,6 +192,10 @@ public final class ConfigSection {
             return Collections.emptyList();
         }
         return new ArrayList<String>(node.children().keySet());
+    }
+
+    public List<String> getKeys() {
+        return keys();
     }
 
     public List<ConfigSection> sections() {

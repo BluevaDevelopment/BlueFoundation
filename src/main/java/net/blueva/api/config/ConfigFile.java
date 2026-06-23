@@ -5,9 +5,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /** Loaded BlueAPI configuration file. */
 public class ConfigFile {
@@ -16,14 +18,22 @@ public class ConfigFile {
     private final Path cacheFile;
     private final ConfigCodec codec;
     private final ConfigDocument defaults;
+    private final Set<String> adoptedCustomPaths;
     private ConfigDocument document;
 
     ConfigFile(Path file, Path cacheFile, ConfigCodec codec, ConfigDocument defaults, ConfigDocument document) {
+        this(file, cacheFile, codec, defaults, document, Collections.<String>emptySet());
+    }
+
+    ConfigFile(Path file, Path cacheFile, ConfigCodec codec, ConfigDocument defaults, ConfigDocument document, Set<String> adoptedCustomPaths) {
         this.file = file;
         this.cacheFile = cacheFile;
         this.codec = codec;
         this.defaults = defaults;
         this.document = document;
+        this.adoptedCustomPaths = adoptedCustomPaths == null
+                ? Collections.<String>emptySet()
+                : new HashSet<String>(adoptedCustomPaths);
     }
 
     public Path file() {
@@ -160,6 +170,25 @@ public class ConfigFile {
         return result;
     }
 
+    public List<Integer> getIntList(String path) {
+        List<Object> values = getList(path);
+        if (values.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<Integer> result = new ArrayList<Integer>();
+        for (Object value : values) {
+            if (value instanceof Number) {
+                result.add(((Number) value).intValue());
+                continue;
+            }
+            try {
+                result.add(Integer.parseInt(String.valueOf(value)));
+            } catch (Exception ignored) {
+            }
+        }
+        return result;
+    }
+
     @SuppressWarnings("unchecked")
     public Map<String, Object> getMap(String path) {
         Object value = get(path);
@@ -187,6 +216,11 @@ public class ConfigFile {
 
     public ConfigFile set(String path, Object value) {
         document.set(path, value);
+        return this;
+    }
+
+    public ConfigFile remove(String path) {
+        document.remove(path);
         return this;
     }
 
@@ -282,7 +316,11 @@ public class ConfigFile {
             String path = entry.getKey();
             ConfigNode local = document.node(path);
             if (local != null) {
-                cache.put(path, entry.getValue(), local);
+                if (adoptedCustomPaths.contains(path)) {
+                    cache.putAdoptedCustom(path, entry.getValue(), local);
+                } else {
+                    cache.put(path, entry.getValue(), local);
+                }
             }
         }
         ConfigIO.writeAtomic(cacheFile, cache.write());

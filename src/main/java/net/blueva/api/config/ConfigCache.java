@@ -20,6 +20,16 @@ final class ConfigCache {
         ));
     }
 
+    void putAdoptedCustom(String path, ConfigNode defaultNode, ConfigNode localNode) {
+        String localHash = hash(localNode == null ? null : localNode.getValue());
+        entries.put(path, new Entry(
+                "adopted-custom:" + localHash,
+                localHash,
+                commentHash(localNode),
+                commentHash(localNode)
+        ));
+    }
+
     String write() {
         StringBuilder builder = new StringBuilder();
         builder.append(HEADER).append('\n');

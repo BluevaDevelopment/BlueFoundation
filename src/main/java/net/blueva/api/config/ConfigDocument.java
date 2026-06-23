@@ -42,6 +42,21 @@ public class ConfigDocument {
         nodeOrCreate(path).setValue(value);
     }
 
+    public boolean remove(String path) {
+        String[] parts = ConfigPath.parts(path);
+        if (parts.length == 0) {
+            return false;
+        }
+        ConfigNode parent = root;
+        for (int i = 0; i < parts.length - 1; i++) {
+            parent = parent.child(parts[i]);
+            if (parent == null) {
+                return false;
+            }
+        }
+        return parent.removeChild(parts[parts.length - 1]) != null;
+    }
+
     public ConfigNode node(String path) {
         String[] parts = parts(path);
         ConfigNode current = root;

@@ -206,7 +206,8 @@ final class ConfigValues {
             if (balance < 0 && format != null) {
                 throw new ConfigParseException(format, i + 1, 1, "Unexpected closing bracket");
             }
-            if (balance <= 0) {
+            boolean quoteOpen = hasUnclosedQuote(current.toString());
+            if (balance <= 0 && !quoteOpen) {
                 result.add(current.toString());
                 current.setLength(0);
                 balance = 0;
@@ -216,6 +217,9 @@ final class ConfigValues {
             throw new ConfigParseException(format, lines.length, 1, "Unclosed inline list or table");
         }
         if (current.length() > 0) {
+            if (format != null && hasUnclosedQuote(current.toString())) {
+                throw new ConfigParseException(format, lines.length, 1, "Unclosed quoted string");
+            }
             result.add(current.toString());
         }
         return result;

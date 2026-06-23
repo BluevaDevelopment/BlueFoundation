@@ -58,6 +58,10 @@ public class ConfigNode {
         }
     }
 
+    public ConfigNode removeChild(String key) {
+        return key == null ? null : children.remove(key);
+    }
+
     public List<String> comments() {
         return comments;
     }
