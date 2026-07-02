@@ -1,19 +1,19 @@
-package net.blueva.api.events;
+package net.blueva.foundation.events;
 
-import net.blueva.api.events.adapter.EntityAirChangeAdapter;
-import net.blueva.api.events.adapter.EntityPickupAdapter;
-import net.blueva.api.events.adapter.EntityToggleGlideAdapter;
-import net.blueva.api.events.adapter.PlayerArmorStandManipulateAdapter;
-import net.blueva.api.events.adapter.PlayerInteractAtEntityAdapter;
-import net.blueva.api.events.adapter.PlayerItemMendAdapter;
-import net.blueva.api.events.adapter.PlayerSwapHandItemsAdapter;
-import net.blueva.api.events.wrapped.EntityAirChange;
-import net.blueva.api.events.wrapped.EntityPickup;
-import net.blueva.api.events.wrapped.EntityToggleGlide;
-import net.blueva.api.events.wrapped.PlayerArmorStandManipulate;
-import net.blueva.api.events.wrapped.PlayerInteractAtEntity;
-import net.blueva.api.events.wrapped.PlayerItemMend;
-import net.blueva.api.events.wrapped.PlayerSwapHandItems;
+import net.blueva.foundation.events.adapter.EntityAirChangeAdapter;
+import net.blueva.foundation.events.adapter.EntityPickupAdapter;
+import net.blueva.foundation.events.adapter.EntityToggleGlideAdapter;
+import net.blueva.foundation.events.adapter.PlayerArmorStandManipulateAdapter;
+import net.blueva.foundation.events.adapter.PlayerInteractAtEntityAdapter;
+import net.blueva.foundation.events.adapter.PlayerItemMendAdapter;
+import net.blueva.foundation.events.adapter.PlayerSwapHandItemsAdapter;
+import net.blueva.foundation.events.wrapped.EntityAirChange;
+import net.blueva.foundation.events.wrapped.EntityPickup;
+import net.blueva.foundation.events.wrapped.EntityToggleGlide;
+import net.blueva.foundation.events.wrapped.PlayerArmorStandManipulate;
+import net.blueva.foundation.events.wrapped.PlayerInteractAtEntity;
+import net.blueva.foundation.events.wrapped.PlayerItemMend;
+import net.blueva.foundation.events.wrapped.PlayerSwapHandItems;
 import org.bukkit.event.EventPriority;
 import org.bukkit.plugin.Plugin;
 

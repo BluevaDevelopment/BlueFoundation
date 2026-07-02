@@ -1,6 +1,6 @@
-package net.blueva.api.events.adapter;
+package net.blueva.foundation.events.adapter;
 
-import net.blueva.api.events.wrapped.EntityToggleGlide;
+import net.blueva.foundation.events.wrapped.EntityToggleGlide;
 import org.bukkit.entity.Entity;
 import org.bukkit.event.Event;
 import org.bukkit.event.EventException;

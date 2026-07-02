@@ -1,4 +1,4 @@
-package net.blueva.api.events;
+package net.blueva.foundation.events;
 
 import org.bukkit.event.EventPriority;
 import org.bukkit.plugin.Plugin;
@@ -35,24 +35,24 @@ public class Events {
         return manager().register(plugin, wrappedEvent, priority);
     }
 
-    public interface EntityPickup extends net.blueva.api.events.wrapped.EntityPickup {
+    public interface EntityPickup extends net.blueva.foundation.events.wrapped.EntityPickup {
     }
 
-    public interface PlayerSwapHandItems extends net.blueva.api.events.wrapped.PlayerSwapHandItems {
+    public interface PlayerSwapHandItems extends net.blueva.foundation.events.wrapped.PlayerSwapHandItems {
     }
 
-    public interface PlayerItemMend extends net.blueva.api.events.wrapped.PlayerItemMend {
+    public interface PlayerItemMend extends net.blueva.foundation.events.wrapped.PlayerItemMend {
     }
 
-    public interface EntityToggleGlide extends net.blueva.api.events.wrapped.EntityToggleGlide {
+    public interface EntityToggleGlide extends net.blueva.foundation.events.wrapped.EntityToggleGlide {
     }
 
-    public interface EntityAirChange extends net.blueva.api.events.wrapped.EntityAirChange {
+    public interface EntityAirChange extends net.blueva.foundation.events.wrapped.EntityAirChange {
     }
 
-    public interface PlayerInteractAtEntity extends net.blueva.api.events.wrapped.PlayerInteractAtEntity {
+    public interface PlayerInteractAtEntity extends net.blueva.foundation.events.wrapped.PlayerInteractAtEntity {
     }
 
-    public interface PlayerArmorStandManipulate extends net.blueva.api.events.wrapped.PlayerArmorStandManipulate {
+    public interface PlayerArmorStandManipulate extends net.blueva.foundation.events.wrapped.PlayerArmorStandManipulate {
     }
 }

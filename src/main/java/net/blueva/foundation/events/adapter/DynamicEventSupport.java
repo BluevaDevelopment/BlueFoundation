@@ -1,4 +1,4 @@
-package net.blueva.api.events.adapter;
+package net.blueva.foundation.events.adapter;
 
 import org.bukkit.Bukkit;
 import org.bukkit.event.Cancellable;

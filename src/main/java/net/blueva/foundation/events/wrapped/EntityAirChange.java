@@ -1,6 +1,6 @@
-package net.blueva.api.events.wrapped;
+package net.blueva.foundation.events.wrapped;
 
-import net.blueva.api.events.WrappedEvent;
+import net.blueva.foundation.events.WrappedEvent;
 import org.bukkit.entity.Entity;
 
 /** Stable wrapper for EntityAirChangeEvent (1.12+). */

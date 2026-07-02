@@ -1,6 +1,6 @@
-package net.blueva.api.events.adapter;
+package net.blueva.foundation.events.adapter;
 
-import net.blueva.api.events.wrapped.PlayerItemMend;
+import net.blueva.foundation.events.wrapped.PlayerItemMend;
 import org.bukkit.entity.ExperienceOrb;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;

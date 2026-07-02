@@ -1,6 +1,6 @@
-package net.blueva.api.events.adapter;
+package net.blueva.foundation.events.adapter;
 
-import net.blueva.api.events.wrapped.PlayerInteractAtEntity;
+import net.blueva.foundation.events.wrapped.PlayerInteractAtEntity;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;

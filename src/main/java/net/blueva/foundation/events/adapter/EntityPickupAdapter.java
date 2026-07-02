@@ -1,6 +1,6 @@
-package net.blueva.api.events.adapter;
+package net.blueva.foundation.events.adapter;
 
-import net.blueva.api.events.wrapped.EntityPickup;
+import net.blueva.foundation.events.wrapped.EntityPickup;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Item;

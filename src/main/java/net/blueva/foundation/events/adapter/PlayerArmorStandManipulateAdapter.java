@@ -1,6 +1,6 @@
-package net.blueva.api.events.adapter;
+package net.blueva.foundation.events.adapter;
 
-import net.blueva.api.events.wrapped.PlayerArmorStandManipulate;
+import net.blueva.foundation.events.wrapped.PlayerArmorStandManipulate;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
