@@ -1,4 +1,4 @@
-package net.blueva.api.config;
+package net.blueva.foundation.config;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Registry for multiple configuration files backed by BlueAPI Configs.
+ * Registry for multiple configuration files backed by BlueFoundation Configs.
  * Useful for modules or addons that store several YAML/TOML files under one data folder.
  */
 public final class ConfigRegistry {
@@ -139,7 +139,7 @@ public final class ConfigRegistry {
 
     public String getString(String fileName, String path) {
         Object value = get(fileName, path);
-        return value == null ? null : String.valueOf(value);
+        return value == null ? null : ConfigValues.string(value);
     }
 
     public String getString(String fileName, String path, String fallback) {
@@ -205,7 +205,7 @@ public final class ConfigRegistry {
         }
         List<String> result = new ArrayList<String>();
         for (Object entry : (List<Object>) value) {
-            result.add(String.valueOf(entry));
+            result.add(ConfigValues.string(entry));
         }
         return result;
     }

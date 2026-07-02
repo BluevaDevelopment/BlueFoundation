@@ -1,4 +1,4 @@
-package net.blueva.api.config;
+package net.blueva.foundation.config;
 
 import java.util.LinkedHashMap;
 import java.util.Map;

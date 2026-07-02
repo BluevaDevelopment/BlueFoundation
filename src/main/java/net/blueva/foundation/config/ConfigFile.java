@@ -1,4 +1,4 @@
-package net.blueva.api.config;
+package net.blueva.foundation.config;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** Loaded BlueAPI configuration file. */
+/** Loaded BlueFoundation configuration file. */
 public class ConfigFile {
 
     private final Path file;
@@ -70,12 +70,12 @@ public class ConfigFile {
 
     public String getString(String path) {
         Object value = get(path);
-        return value == null ? "" : String.valueOf(value);
+        return ConfigValues.string(value);
     }
 
     public String getString(String path, String fallback) {
         Object value = get(path);
-        return value == null ? fallback : String.valueOf(value);
+        return value == null ? fallback : ConfigValues.string(value);
     }
 
     public int getInt(String path) {
@@ -165,7 +165,7 @@ public class ConfigFile {
         }
         List<String> result = new ArrayList<>();
         for (Object value : values) {
-            result.add(String.valueOf(value));
+            result.add(ConfigValues.string(value));
         }
         return result;
     }

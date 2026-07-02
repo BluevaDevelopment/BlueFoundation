@@ -1,4 +1,4 @@
-package net.blueva.api.config;
+package net.blueva.foundation.config;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -41,7 +41,13 @@ final class ConfigIO {
         Path directory = (root == null ? file.toAbsolutePath().getParent() : root).resolve("config-backups");
         Files.createDirectories(directory);
         String stamp = new SimpleDateFormat("yyyyMMdd-HHmmss-SSS").format(new Date());
-        Path target = directory.resolve(file.getFileName().toString() + "." + stamp + ".bak");
+        String baseName = file.getFileName().toString() + "." + stamp;
+        Path target = directory.resolve(baseName + ".bak");
+        int attempt = 1;
+        while (Files.exists(target)) {
+            target = directory.resolve(baseName + "-" + attempt + ".bak");
+            attempt++;
+        }
         Files.copy(file, target, StandardCopyOption.COPY_ATTRIBUTES);
         return target;
     }

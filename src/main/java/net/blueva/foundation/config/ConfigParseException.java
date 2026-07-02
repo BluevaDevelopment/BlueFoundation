@@ -1,6 +1,6 @@
-package net.blueva.api.config;
+package net.blueva.foundation.config;
 
-/** Thrown when BlueAPI cannot parse a configuration document safely. */
+/** Thrown when BlueFoundation cannot parse a configuration document safely. */
 public class ConfigParseException extends IllegalArgumentException {
     private final ConfigFormat format;
     private final int line;

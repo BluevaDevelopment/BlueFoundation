@@ -1,4 +1,4 @@
-package net.blueva.api.config;
+package net.blueva.foundation.config;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -142,7 +142,7 @@ public final class ConfigSection {
         }
         List<String> result = new ArrayList<String>();
         for (Object value : values) {
-            result.add(String.valueOf(value));
+            result.add(ConfigValues.string(value));
         }
         return result;
     }

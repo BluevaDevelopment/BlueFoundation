@@ -1,4 +1,4 @@
-package net.blueva.api.config;
+package net.blueva.foundation.config;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -9,6 +9,8 @@ import java.util.Map;
 import java.util.Set;
 
 final class YamlConfigCodec implements ConfigCodec {
+
+    private static final String BLANK_LINE_COMMENT = "\u0000blank-line";
 
     @Override
     public ConfigDocument read(String text) {
@@ -24,6 +26,9 @@ final class YamlConfigCodec implements ConfigCodec {
         for (String line : ConfigValues.logicalLines(text, ConfigFormat.YAML)) {
             lineNumber++;
             if (line.trim().isEmpty()) {
+                if (comments.isEmpty() || !BLANK_LINE_COMMENT.equals(comments.get(comments.size() - 1))) {
+                    comments.add(BLANK_LINE_COMMENT);
+                }
                 continue;
             }
             if (line.indexOf('\t') >= 0) {
@@ -32,6 +37,9 @@ final class YamlConfigCodec implements ConfigCodec {
             String trimmed = line.trim();
             if (trimmed.startsWith("#")) {
                 comments.add(trimmed.substring(1).trim());
+                continue;
+            }
+            if (trimmed.equals("---") || trimmed.equals("...")) {
                 continue;
             }
             if (ConfigValues.hasUnclosedYamlQuotedValue(line)) {
@@ -66,7 +74,7 @@ final class YamlConfigCodec implements ConfigCodec {
                     Map<String, Object> storedMap = castMap(stored.get(stored.size() - 1));
                     stack.add(new Frame(indent, frame.path, activeMap(raw, storedMap), null));
                 } else {
-                    list.add(parseYamlValue(raw, anchors));
+                    list.add(parseYamlValue(normalizeColonSeparatedListScalar(raw), anchors));
                     listNode.setValue(list);
                 }
                 comments.clear();
@@ -169,6 +177,10 @@ final class YamlConfigCodec implements ConfigCodec {
 
     private void writeNode(StringBuilder builder, String key, ConfigNode node, int indent) {
         for (String comment : node.comments()) {
+            if (BLANK_LINE_COMMENT.equals(comment)) {
+                builder.append('\n');
+                continue;
+            }
             spaces(builder, indent).append("# ").append(comment).append('\n');
         }
         spaces(builder, indent).append(ConfigPath.yamlKey(key)).append(':');
@@ -271,14 +283,24 @@ final class YamlConfigCodec implements ConfigCodec {
     }
 
     private static Map<String, Object> parseListMap(String raw, Map<String, Object> anchors) {
-        int colon = ConfigValues.separatorIndex(raw, ':');
+        if (raw == null) {
+            return null;
+        }
+        String trimmed = raw.trim();
+        int colon = listMapSeparatorIndex(raw);
         if (colon < 0 || raw.startsWith("{") || raw.startsWith("[")) {
+            return null;
+        }
+        if (!normalizeColonSeparatedListScalar(raw).equals(raw)) {
             return null;
         }
         LinkedHashMap<String, Object> map = new LinkedHashMap<>();
         String key = raw.substring(0, colon).trim();
         if (ConfigValues.isQuoted(key)) {
             key = ConfigValues.unquote(key);
+        }
+        if (key.startsWith("<") && !"<<".equals(key)) {
+            return null;
         }
         String value = raw.substring(colon + 1).trim();
         if ("<<".equals(key)) {
@@ -308,6 +330,39 @@ final class YamlConfigCodec implements ConfigCodec {
             return parsed;
         }
         return ConfigValues.parse(value, ConfigFormat.YAML);
+    }
+
+    private static int listMapSeparatorIndex(String raw) {
+        int colon = ConfigValues.separatorIndex(raw, ':');
+        if (colon < 0) {
+            return -1;
+        }
+        if (colon == raw.length() - 1) {
+            return colon;
+        }
+        return Character.isWhitespace(raw.charAt(colon + 1)) ? colon : -1;
+    }
+
+    private static String normalizeColonSeparatedListScalar(String raw) {
+        int colon = ConfigValues.separatorIndex(raw, ':');
+        if (colon < 0 || colon == raw.length() - 1 || !Character.isWhitespace(raw.charAt(colon + 1))) {
+            return raw;
+        }
+        String key = raw.substring(0, colon).trim();
+        String value = raw.substring(colon + 1).trim();
+        if (key.isEmpty() || value.indexOf(':') < 0 || containsWhitespace(key) || containsWhitespace(value)) {
+            return raw;
+        }
+        return key + ":" + value;
+    }
+
+    private static boolean containsWhitespace(String value) {
+        for (int i = 0; i < value.length(); i++) {
+            if (Character.isWhitespace(value.charAt(i))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @SuppressWarnings("unchecked")

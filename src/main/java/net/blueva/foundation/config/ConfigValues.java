@@ -1,4 +1,4 @@
-package net.blueva.api.config;
+package net.blueva.foundation.config;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -35,7 +35,15 @@ final class ConfigValues {
             return parseList(value.substring(1, value.length() - 1), format);
         }
         if (value.startsWith("{") && value.endsWith("}")) {
-            return parseMap(value.substring(1, value.length() - 1), format);
+            String inner = value.substring(1, value.length() - 1);
+            String placeholder = normalizeBracedPlaceholder(inner, format);
+            if (placeholder != null) {
+                return placeholder;
+            }
+            if (shouldParseInlineMap(inner, format)) {
+                return parseMap(inner, format);
+            }
+            return value;
         }
         if ("true".equals(value)) {
             return Boolean.TRUE;
@@ -73,6 +81,43 @@ final class ConfigValues {
         } catch (NumberFormatException ignored) {
             return value;
         }
+    }
+
+
+    static String string(Object value) {
+        if (value == null) {
+            return "";
+        }
+        if (value instanceof Map) {
+            return mapAsString((Map<?, ?>) value);
+        }
+        return String.valueOf(value);
+    }
+
+    private static String mapAsString(Map<?, ?> map) {
+        if (map == null || map.isEmpty()) {
+            return "{}";
+        }
+        if (map.size() == 1) {
+            Map.Entry<?, ?> entry = map.entrySet().iterator().next();
+            String key = unquoteIfQuoted(String.valueOf(entry.getKey()).trim());
+            Object rawValue = entry.getValue();
+            String value = rawValue == null ? "" : unquoteIfQuoted(string(rawValue).trim());
+            if (isPlaceholderKey(key) && value.isEmpty()) {
+                return "{" + key + "}";
+            }
+            return value.isEmpty() ? key : key + ": " + value;
+        }
+        return map(map, false);
+    }
+
+
+    private static String unquoteIfQuoted(String value) {
+        return isQuoted(value) ? unquote(value) : value;
+    }
+
+    private static boolean isPlaceholderKey(String key) {
+        return key != null && key.matches("[A-Za-z0-9_.%-]+");
     }
 
     static String yaml(Object value) {
@@ -383,22 +428,110 @@ final class ConfigValues {
         return result;
     }
 
+
+
+    private static String normalizeBracedPlaceholder(String raw, ConfigFormat format) {
+        if (format != ConfigFormat.YAML || raw == null) {
+            return null;
+        }
+        String trimmed = raw.trim();
+        if (trimmed.indexOf('<') >= 0 || trimmed.indexOf('>') >= 0) {
+            return null;
+        }
+        if (trimmed.matches("[A-Za-z0-9_.%-]+")) {
+            return "{" + trimmed + "}";
+        }
+        int separator = topLevelMapSeparator(trimmed, format);
+        if (separator < 0) {
+            return null;
+        }
+        String key = trimmed.substring(0, separator).trim();
+        String value = trimmed.substring(separator + 1).trim();
+        if (!key.matches("[A-Za-z0-9_.%-]+")) {
+            return null;
+        }
+        if (value.isEmpty() || "\"\"".equals(value) || "''".equals(value)) {
+            return "{" + key + "}";
+        }
+        return null;
+    }
+
+    private static boolean shouldParseInlineMap(String raw, ConfigFormat format) {
+        if (raw == null || raw.trim().isEmpty()) {
+            return true;
+        }
+        if (format == ConfigFormat.YAML && looksLikeBracedText(raw)) {
+            return false;
+        }
+        for (String entry : splitTopLevel(raw)) {
+            String trimmed = entry.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            if (topLevelMapSeparator(trimmed, format) < 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean looksLikeBracedText(String raw) {
+        String trimmed = raw.trim();
+        if (trimmed.indexOf('<') >= 0 || trimmed.indexOf('>') >= 0) {
+            return true;
+        }
+        return trimmed.matches("[A-Za-z0-9_.%-]+") || trimmed.matches("[A-Za-z0-9_.%-]+\\s*[:=]?");
+    }
+
+    private static int topLevelMapSeparator(String entry, ConfigFormat format) {
+        boolean single = false;
+        boolean doubleQuote = false;
+        boolean escaped = false;
+        int bracket = 0;
+        int brace = 0;
+        int angle = 0;
+        for (int i = 0; i < entry.length(); i++) {
+            char c = entry.charAt(i);
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+            if (c == '\\' && doubleQuote) {
+                escaped = true;
+                continue;
+            }
+            if (c == '\'' && !doubleQuote) {
+                single = !single;
+            } else if (c == '"' && !single) {
+                doubleQuote = !doubleQuote;
+            } else if (!single && !doubleQuote) {
+                if (c == '[') {
+                    bracket++;
+                } else if (c == ']') {
+                    bracket--;
+                } else if (c == '{') {
+                    brace++;
+                } else if (c == '}') {
+                    brace--;
+                } else if (format == ConfigFormat.YAML && c == '<') {
+                    angle++;
+                } else if (format == ConfigFormat.YAML && c == '>' && angle > 0) {
+                    angle--;
+                } else if ((c == ':' || c == '=') && bracket == 0 && brace == 0 && angle == 0) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
     private static Map<String, Object> parseMap(String raw, ConfigFormat format) {
         LinkedHashMap<String, Object> result = new LinkedHashMap<>();
         for (String entry : splitTopLevel(raw)) {
             if (entry.trim().isEmpty()) {
                 continue;
             }
-            int equals = separatorIndex(entry, '=');
-            int colon = separatorIndex(entry, ':');
-            int separator;
-            if (equals < 0) {
-                separator = colon;
-            } else if (colon < 0) {
-                separator = equals;
-            } else {
-                separator = Math.min(equals, colon);
-            }
+            int separator = topLevelMapSeparator(entry, format);
             if (separator < 0) {
                 result.put(entry.trim(), "");
                 continue;
@@ -551,8 +684,11 @@ final class ConfigValues {
             return true;
         }
         if (value.startsWith(" ") || value.endsWith(" ") || value.startsWith("[") || value.startsWith("{")
-                || value.startsWith("#") || value.contains(": ") || value.contains(" #") || value.contains("\n")
-                || value.indexOf('\t') >= 0 || value.indexOf('"') >= 0) {
+                || value.startsWith("#") || value.startsWith("<") || value.startsWith("&") || value.startsWith("§")
+                || value.contains(":") || value.contains(" #") || value.contains("\n")
+                || value.indexOf('\t') >= 0 || value.indexOf('"') >= 0
+                || value.indexOf('[') >= 0 || value.indexOf(']') >= 0
+                || value.indexOf('{') >= 0 || value.indexOf('}') >= 0) {
             return true;
         }
         try {

@@ -1,4 +1,4 @@
-package net.blueva.api.config;
+package net.blueva.foundation.config;
 
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -10,7 +10,7 @@ import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
 
-/** BlueAPI configuration entry point. */
+/** BlueFoundation configuration entry point. */
 public class Configs {
 
     protected Configs() {
@@ -43,7 +43,7 @@ public class Configs {
         }
         ConfigCodec codec = ConfigCodecs.of(format);
         Path file = dataFolder.resolve(resourceName);
-        Path cache = dataFolder.resolve(".blueapi").resolve("config-cache").resolve(safeCacheName(resourceName));
+        Path cache = dataFolder.resolve(".bluefoundation").resolve("config-cache").resolve(safeCacheName(resourceName));
 
         try {
             String defaultText = resource(classLoader, resourceName);
@@ -107,7 +107,7 @@ public class Configs {
     private static ConfigFile loadFile(Path file, String defaultText, ConfigFormat format) throws IOException {
         ConfigCodec codec = ConfigCodecs.of(format);
         Path dataFolder = file.getParent() == null ? java.nio.file.Paths.get("") : file.getParent();
-        Path cache = dataFolder.resolve(".blueapi").resolve("config-cache").resolve(safeCacheName(file.getFileName().toString()));
+        Path cache = dataFolder.resolve(".bluefoundation").resolve("config-cache").resolve(safeCacheName(file.getFileName().toString()));
         ConfigDocument defaults = codec.read(defaultText);
         boolean existedBeforeLoad = Files.exists(file);
         boolean cacheExistedBeforeLoad = Files.exists(cache);

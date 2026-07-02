@@ -1,4 +1,4 @@
-package net.blueva.api.config;
+package net.blueva.foundation.config;
 
 /** Parsed TOML date/time value. */
 public final class ConfigDateTime {

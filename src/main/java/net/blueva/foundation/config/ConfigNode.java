@@ -1,4 +1,4 @@
-package net.blueva.api.config;
+package net.blueva.foundation.config;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -6,7 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** A node in a BlueAPI configuration document. */
+/** A node in a BlueFoundation configuration document. */
 public class ConfigNode {
 
     private final LinkedHashMap<String, ConfigNode> children = new LinkedHashMap<>();

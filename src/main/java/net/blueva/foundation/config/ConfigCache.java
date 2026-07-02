@@ -1,10 +1,10 @@
-package net.blueva.api.config;
+package net.blueva.foundation.config;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 final class ConfigCache {
-    private static final String HEADER = "blueapi_config_cache=2";
+    private static final String HEADER = "bluefoundation_config_cache=2";
     private final LinkedHashMap<String, Entry> entries = new LinkedHashMap<>();
 
     Entry get(String path) {
@@ -55,7 +55,7 @@ final class ConfigCache {
         }
         String[] lines = text.replace("\r\n", "\n").replace('\r', '\n').split("\n");
         for (String line : lines) {
-            if (line.startsWith("blueapi_config_cache=") || line.trim().isEmpty() || line.startsWith("#")) {
+            if (line.startsWith("bluefoundation_config_cache=") || line.trim().isEmpty() || line.startsWith("#")) {
                 continue;
             }
             String[] parts = line.split("\\|", 5);

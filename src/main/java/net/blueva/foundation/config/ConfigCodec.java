@@ -1,4 +1,4 @@
-package net.blueva.api.config;
+package net.blueva.foundation.config;
 
 interface ConfigCodec {
     ConfigDocument read(String text);
