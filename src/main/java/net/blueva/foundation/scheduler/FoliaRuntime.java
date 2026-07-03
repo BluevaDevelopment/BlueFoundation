@@ -1,4 +1,4 @@
-package net.blueva.api.scheduler;
+package net.blueva.foundation.scheduler;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;

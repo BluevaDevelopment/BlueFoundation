@@ -1,4 +1,4 @@
-package net.blueva.api.sounds;
+package net.blueva.foundation.sounds;
 
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;

@@ -1,4 +1,4 @@
-package net.blueva.api.scheduler;
+package net.blueva.foundation.scheduler;
 
 final class FoliaTaskHandle implements Scheduler.Task {
     private final Object task;

@@ -1,4 +1,4 @@
-package net.blueva.api.materials;
+package net.blueva.foundation.materials;
 
 import org.bukkit.Material;
 

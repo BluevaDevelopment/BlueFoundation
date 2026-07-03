@@ -1,4 +1,4 @@
-package net.blueva.api.version;
+package net.blueva.foundation.version;
 
 import org.bukkit.Bukkit;
 

@@ -1,8 +1,7 @@
-package net.blueva.api.items;
+package net.blueva.foundation.items;
 
-import net.blueva.api.materials.Materials;
-import net.blueva.api.text.Text;
-import net.kyori.adventure.text.Component;
+import net.blueva.foundation.materials.Materials;
+import net.blueva.foundation.text.Text;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
 import org.bukkit.Material;
@@ -76,14 +75,10 @@ public class Items {
     }
 
     public static ItemStack name(ItemStack item, String name) {
-        return name(item, isBlank(name) ? null : Text.component(name));
-    }
-
-    public static ItemStack name(ItemStack item, Component name) {
         return editMeta(item, new MetaEditor() {
             @Override
             public void edit(ItemMeta meta) {
-                meta.setDisplayName(name == null ? null : Text.legacySection(name));
+                meta.setDisplayName(isBlank(name) ? null : Text.legacySection(name));
             }
         });
     }
@@ -106,14 +101,6 @@ public class Items {
 
     public static ItemStack loreSplit(ItemStack item, Collection<String> lore, boolean keepEmptyLines) {
         return setLegacyLore(item, legacyLines(splitLines(lore, keepEmptyLines)));
-    }
-
-    public static ItemStack loreComponents(ItemStack item, Component... lore) {
-        return loreComponents(item, lore == null ? null : Arrays.asList(lore));
-    }
-
-    public static ItemStack loreComponents(ItemStack item, Collection<? extends Component> lore) {
-        return setLegacyLore(item, legacyComponentLines(lore));
     }
 
     private static ItemStack setLegacyLore(ItemStack item, final List<String> lore) {
@@ -139,14 +126,6 @@ public class Items {
 
     public static ItemStack addLoreSplit(ItemStack item, Collection<String> lines, boolean keepEmptyLines) {
         return addLegacyLore(item, legacyLines(splitLines(lines, keepEmptyLines)));
-    }
-
-    public static ItemStack addLoreComponents(ItemStack item, Component... lines) {
-        return addLoreComponents(item, lines == null ? null : Arrays.asList(lines));
-    }
-
-    public static ItemStack addLoreComponents(ItemStack item, Collection<? extends Component> lines) {
-        return addLegacyLore(item, legacyComponentLines(lines));
     }
 
     private static ItemStack addLegacyLore(ItemStack item, final List<String> lines) {
@@ -394,6 +373,97 @@ public class Items {
         return value instanceof Byte ? Boolean.valueOf(((Byte) value).byteValue() != 0) : null;
     }
 
+
+    public static String pdcDebug(ItemStack item, Object namespacedKey, String typeName) {
+        StringBuilder debug = new StringBuilder();
+        debug.append("item=").append(item == null ? "null" : item.getType().name());
+        debug.append(", key=").append(namespacedKey == null ? "null" : namespacedKey);
+        debug.append(", keyClass=").append(namespacedKey == null ? "null" : namespacedKey.getClass().getName());
+        debug.append(", type=").append(typeName);
+        ItemMeta meta = item == null ? null : safeMeta(item);
+        debug.append(", meta=").append(meta == null ? "null" : meta.getClass().getName());
+        if (meta == null) {
+            return debug.toString();
+        }
+
+        debug.append(", pdcProbe={").append(debugPdc(meta, namespacedKey, typeName)).append('}');
+        debug.append(", customProbe={").append(debugCustomItemTag(meta, namespacedKey, typeName)).append('}');
+        debug.append(", apiValue=").append(getPdc(item, namespacedKey, typeName));
+        return debug.toString();
+    }
+
+    private static String debugPdc(ItemMeta meta, Object namespacedKey, String typeName) {
+        StringBuilder debug = new StringBuilder();
+        try {
+            Class<?> itemMetaClass = Class.forName("org.bukkit.inventory.meta.ItemMeta");
+            debug.append("itemMetaClass=ok");
+            Method containerGetter = itemMetaClass.getMethod("getPersistentDataContainer");
+            debug.append(", getter=ok");
+            Object container = containerGetter.invoke(meta);
+            debug.append(", container=").append(container == null ? "null" : container.getClass().getName());
+            Class<?> namespacedKeyClass = Class.forName("org.bukkit.NamespacedKey");
+            debug.append(", keyApi=ok");
+            debug.append(", keyInstance=").append(namespacedKeyClass.isInstance(namespacedKey));
+            Class<?> typeClass = Class.forName("org.bukkit.persistence.PersistentDataType");
+            debug.append(", typeApi=ok");
+            Object type = typeClass.getField(typeName.trim().toUpperCase()).get(null);
+            debug.append(", typeField=ok");
+            Class<?> containerClass = Class.forName("org.bukkit.persistence.PersistentDataContainer");
+            debug.append(", containerApi=ok");
+            debug.append(", containerInstance=").append(container != null && containerClass.isInstance(container));
+            if (container != null && containerClass.isInstance(container) && namespacedKeyClass.isInstance(namespacedKey)) {
+                Method has = containerClass.getMethod("has", namespacedKeyClass, typeClass);
+                Object hasResult = has.invoke(container, namespacedKey, type);
+                Method get = containerClass.getMethod("get", namespacedKeyClass, typeClass);
+                Object value = get.invoke(container, namespacedKey, type);
+                debug.append(", has=").append(hasResult).append(", value=").append(value);
+            }
+        } catch (Throwable throwable) {
+            debug.append(", error=").append(throwable.getClass().getName()).append(':').append(throwable.getMessage());
+            Throwable cause = throwable.getCause();
+            if (cause != null) {
+                debug.append(", cause=").append(cause.getClass().getName()).append(':').append(cause.getMessage());
+            }
+        }
+        return debug.toString();
+    }
+
+    private static String debugCustomItemTag(ItemMeta meta, Object namespacedKey, String typeName) {
+        StringBuilder debug = new StringBuilder();
+        try {
+            Class<?> itemMetaClass = Class.forName("org.bukkit.inventory.meta.ItemMeta");
+            debug.append("itemMetaClass=ok");
+            Method containerGetter = itemMetaClass.getMethod("getCustomTagContainer");
+            debug.append(", getter=ok");
+            Object container = containerGetter.invoke(meta);
+            debug.append(", container=").append(container == null ? "null" : container.getClass().getName());
+            Class<?> namespacedKeyClass = Class.forName("org.bukkit.NamespacedKey");
+            debug.append(", keyApi=ok");
+            debug.append(", keyInstance=").append(namespacedKeyClass.isInstance(namespacedKey));
+            Class<?> typeClass = Class.forName("org.bukkit.inventory.meta.tags.ItemTagType");
+            debug.append(", typeApi=ok");
+            Object type = typeClass.getField(typeName.trim().toUpperCase()).get(null);
+            debug.append(", typeField=ok");
+            Class<?> containerClass = Class.forName("org.bukkit.inventory.meta.tags.CustomItemTagContainer");
+            debug.append(", containerApi=ok");
+            debug.append(", containerInstance=").append(container != null && containerClass.isInstance(container));
+            if (container != null && containerClass.isInstance(container) && namespacedKeyClass.isInstance(namespacedKey)) {
+                Method has = containerClass.getMethod("hasCustomTag", namespacedKeyClass, typeClass);
+                Object hasResult = has.invoke(container, namespacedKey, type);
+                Method get = containerClass.getMethod("getCustomTag", namespacedKeyClass, typeClass);
+                Object value = get.invoke(container, namespacedKey, type);
+                debug.append(", has=").append(hasResult).append(", value=").append(value);
+            }
+        } catch (Throwable throwable) {
+            debug.append(", error=").append(throwable.getClass().getName()).append(':').append(throwable.getMessage());
+            Throwable cause = throwable.getCause();
+            if (cause != null) {
+                debug.append(", cause=").append(cause.getClass().getName()).append(':').append(cause.getMessage());
+            }
+        }
+        return debug.toString();
+    }
+
     public static boolean pdcHas(ItemStack item, String namespace, String key, String typeName) {
         return pdcHas(item, namespacedKey(namespace, key), typeName);
     }
@@ -479,17 +549,6 @@ public class Items {
             }
         }
         return split;
-    }
-
-    private static List<String> legacyComponentLines(Collection<? extends Component> lines) {
-        if (lines == null) {
-            return null;
-        }
-        List<String> legacy = new ArrayList<>();
-        for (Component line : lines) {
-            legacy.add(Text.legacySection(line));
-        }
-        return legacy;
     }
 
     private static ItemFlag resolveFlag(String name) {
@@ -583,7 +642,8 @@ public class Items {
             return null;
         }
         try {
-            Method containerGetter = meta.getClass().getMethod("getPersistentDataContainer");
+            Class<?> itemMetaClass = Class.forName("org.bukkit.inventory.meta.ItemMeta");
+            Method containerGetter = itemMetaClass.getMethod("getPersistentDataContainer");
             Object container = containerGetter.invoke(meta);
             if (container == null) {
                 return null;
@@ -669,7 +729,8 @@ public class Items {
             if (!namespacedKeyClass.isInstance(namespacedKey)) {
                 return null;
             }
-            Method containerGetter = meta.getClass().getMethod("getCustomTagContainer");
+            Class<?> itemMetaClass = Class.forName("org.bukkit.inventory.meta.ItemMeta");
+            Method containerGetter = itemMetaClass.getMethod("getCustomTagContainer");
             Object container = containerGetter.invoke(meta);
             if (container == null) {
                 return null;
@@ -1227,11 +1288,6 @@ public class Items {
             return this;
         }
 
-        public Builder name(Component name) {
-            Items.name(item, name);
-            return this;
-        }
-
         public Builder lore(String... lore) {
             Items.lore(item, lore);
             return this;
@@ -1257,16 +1313,6 @@ public class Items {
             return this;
         }
 
-        public Builder loreComponents(Component... lore) {
-            Items.loreComponents(item, lore);
-            return this;
-        }
-
-        public Builder loreComponents(Collection<? extends Component> lore) {
-            Items.loreComponents(item, lore);
-            return this;
-        }
-
         public Builder addLore(String... lines) {
             Items.addLore(item, lines);
             return this;
@@ -1284,16 +1330,6 @@ public class Items {
 
         public Builder addLoreSplit(Collection<String> lines, boolean keepEmptyLines) {
             Items.addLoreSplit(item, lines, keepEmptyLines);
-            return this;
-        }
-
-        public Builder addLoreComponents(Component... lines) {
-            Items.addLoreComponents(item, lines);
-            return this;
-        }
-
-        public Builder addLoreComponents(Collection<? extends Component> lines) {
-            Items.addLoreComponents(item, lines);
             return this;
         }
 

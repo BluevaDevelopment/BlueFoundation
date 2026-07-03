@@ -1,4 +1,4 @@
-package net.blueva.api.dependencies;
+package net.blueva.foundation.dependencies;
 
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -43,61 +43,24 @@ public class Dependencies {
     }
 
     /**
-     * Loads the Adventure stack required by BlueAPI text/message utilities.
+     * Previously loaded the Adventure stack required by BlueFoundation text/message
+     * utilities. This is now a no-op: BlueFoundation provides its own MiniMessage
+     * parser and legacy serializers that do not require Adventure at runtime.
      *
-     * <p>Paper versions that expose native Adventure audiences do not need
-     * {@code adventure-platform-bukkit}. Spigot/Bukkit servers do, so this
-     * profile only injects the pieces missing from the current classpath.</p>
+     * @deprecated kept for backwards compatibility; does nothing.
      */
+    @Deprecated
     public static void loadAdventure(JavaPlugin plugin) {
-        load(plugin, adventureDependencies());
+        // Adventure is no longer required at runtime.
     }
 
     /**
-     * @return runtime dependencies required before using {@code BlueAPI.Text}
-     * or {@code BlueAPI.Messages} on servers that do not already provide them.
+     * @return an empty list; Adventure is no longer required at runtime.
+     * @deprecated BlueFoundation no longer needs Adventure on Spigot/Bukkit.
      */
+    @Deprecated
     public static List<RuntimeDependency> adventureDependencies() {
-        List<RuntimeDependency> dependencies = new ArrayList<>();
-        String adventureVersion = adventureCoreRuntimeVersion();
-
-        if (!classExists("net.kyori.adventure.audience.Audience")) {
-            dependencies.add(mavenCentral("net.kyori", "adventure-api", adventureVersion));
-            dependencies.add(mavenCentral("net.kyori", "adventure-key", adventureVersion));
-            dependencies.add(mavenCentral("net.kyori", "examination-api", Versions.EXAMINATION));
-            dependencies.add(mavenCentral("net.kyori", "examination-string", Versions.EXAMINATION));
-        }
-
-        if (!classExists("net.kyori.adventure.text.minimessage.MiniMessage")) {
-            dependencies.add(mavenCentral("net.kyori", "adventure-text-minimessage", adventureVersion));
-        }
-
-        if (!classExists("net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer")) {
-            dependencies.add(mavenCentral("net.kyori", "adventure-text-serializer-legacy", adventureVersion));
-        }
-
-        if (!classExists("net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer")) {
-            dependencies.add(mavenCentral("net.kyori", "adventure-text-serializer-plain", adventureVersion));
-        }
-
-        if (!nativeAdventureAudienceAvailable()) {
-            dependencies.add(mavenCentral("net.kyori", "adventure-platform-api", Versions.ADVENTURE_PLATFORM));
-            dependencies.add(mavenCentral("net.kyori", "adventure-platform-bukkit", Versions.ADVENTURE_PLATFORM));
-            dependencies.add(mavenCentral("net.kyori", "adventure-platform-facet", Versions.ADVENTURE_PLATFORM));
-            dependencies.add(mavenCentral("net.kyori", "adventure-platform-viaversion", Versions.ADVENTURE_PLATFORM));
-            dependencies.add(mavenCentral("net.kyori", "adventure-text-serializer-bungeecord", Versions.ADVENTURE_PLATFORM));
-            dependencies.add(mavenCentral("net.kyori", "adventure-text-serializer-gson", adventureVersion));
-            if (!isModernAdventureRuntime()) {
-                dependencies.add(mavenCentral("net.kyori", "adventure-text-serializer-gson-legacy-impl", adventureVersion));
-            }
-            dependencies.add(mavenCentral("net.kyori", "adventure-nbt", adventureVersion));
-            if (isModernAdventureRuntime()) {
-                dependencies.add(mavenCentral("net.kyori", "adventure-text-serializer-json", adventureVersion));
-                dependencies.add(mavenCentral("net.kyori", "adventure-text-serializer-json-legacy-impl", adventureVersion));
-            }
-        }
-
-        return dependencies;
+        return new ArrayList<>();
     }
 
     public static RuntimeDependency of(String groupId, String artifactId, String version) {
@@ -134,7 +97,7 @@ public class Dependencies {
         }
     }
 
-    /** Versions used by BlueAPI runtime dependency profiles. */
+    /** Versions used by BlueFoundation runtime dependency profiles. */
     public static class Versions {
         public static final String ADVENTURE_LEGACY = "4.26.1";
         public static final String ADVENTURE_MODERN = "5.1.1";

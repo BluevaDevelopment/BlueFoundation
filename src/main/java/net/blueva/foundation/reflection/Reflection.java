@@ -1,6 +1,6 @@
-package net.blueva.api.reflection;
+package net.blueva.foundation.reflection;
 
-import net.blueva.api.version.Version;
+import net.blueva.foundation.version.Version;
 import org.bukkit.entity.Player;
 
 import java.lang.reflect.Field;

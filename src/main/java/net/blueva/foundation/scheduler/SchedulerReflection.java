@@ -1,4 +1,4 @@
-package net.blueva.api.scheduler;
+package net.blueva.foundation.scheduler;
 
 import java.lang.reflect.Method;
 

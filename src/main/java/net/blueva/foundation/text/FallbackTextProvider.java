@@ -1,137 +1,104 @@
-package net.blueva.api.messages;
+package net.blueva.foundation.text;
 
-import net.blueva.api.reflection.Reflection;
-import net.blueva.api.text.Text;
-import net.kyori.adventure.audience.Audience;
-import net.kyori.adventure.platform.bukkit.BukkitAudiences;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.title.Title;
+import net.blueva.foundation.text.component.BfComponent;
+import net.blueva.foundation.text.minimessage.MiniMessageParser;
+import net.blueva.foundation.text.serializer.LegacySerializer;
+import net.blueva.foundation.text.serializer.PlainSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.plugin.java.JavaPlugin;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
-import java.time.Duration;
 
-/** Adventure/MiniMessage player messaging helpers. */
-public class Messages {
+/**
+ * Text provider used when Adventure is not natively available.
+ * Parses MiniMessage with BlueFoundation's own parser and sends messages via
+ * Bukkit's legacy APIs or packets.
+ */
+final class FallbackTextProvider implements TextProvider {
 
-    private static BukkitAudiences bukkitAudiences;
-
-    protected Messages() {
-    }
-
-    /**
-     * Initializes Adventure transport for Spigot/Bukkit.
-     *
-     * <p>Call {@code BlueAPI.Dependencies.loadAdventure(plugin)} before this
-     * method on servers that do not provide Adventure natively.</p>
-     */
-    public static void init(JavaPlugin plugin) {
-        if (plugin == null || hasNativeAudience()) {
-            return;
-        }
-        close();
-        bukkitAudiences = BukkitAudiences.create(plugin);
-    }
-
-    public static void close() {
-        if (bukkitAudiences != null) {
-            bukkitAudiences.close();
-            bukkitAudiences = null;
-        }
-    }
-
-    public static Component component(String message) {
-        return Text.component(message);
-    }
-
-    /**
-     * Serializes MiniMessage/Adventure input to a legacy section string for
-     * Bukkit APIs that still only accept strings (inventory titles, item meta,
-     * old packet constructors, etc.).
-     */
-    public static String legacy(String message) {
-        return Text.legacySection(message);
-    }
-
-    public static void send(Player player, String message) {
-        send((CommandSender) player, message);
-    }
-
-    public static void send(CommandSender sender, String message) {
+    @Override
+    public void send(CommandSender sender, String message) {
         if (sender == null) {
             return;
         }
-
-        Component component = Text.component(message);
-        Audience audience = audience(sender);
-        if (audience != null) {
-            audience.sendMessage(component);
-            return;
-        }
-
-        sender.sendMessage(Text.legacySection(component));
+        String legacy = legacySection(message);
+        sender.sendMessage(legacy);
     }
 
-    public static boolean actionBar(Player player, String message) {
+    @Override
+    public void broadcast(String message) {
+        String legacy = legacySection(message);
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            player.sendMessage(legacy);
+        }
+        Bukkit.getConsoleSender().sendMessage(legacy);
+    }
+
+    @Override
+    public boolean actionBar(Player player, String message) {
         if (player == null) {
             return false;
         }
-
-        Component component = Text.component(message);
-        Audience audience = audience(player);
-        if (audience != null) {
-            audience.sendActionBar(component);
-            return true;
-        }
-
-        String legacy = Text.legacySection(component);
+        String legacy = legacySection(message);
         return sendActionBarViaSpigot(player, legacy) || sendActionBarViaLegacyPacket(player, legacy);
     }
 
-    public static boolean title(Player player, String title, String subtitle, int fadeIn, int stay, int fadeOut) {
+    @Override
+    public boolean title(Player player, String title, String subtitle, int fadeIn, int stay, int fadeOut) {
         if (player == null) {
             return false;
         }
-
-        Component titleComponent = Text.component(title);
-        Component subtitleComponent = Text.component(subtitle);
-        Audience audience = audience(player);
-        if (audience != null) {
-            audience.showTitle(Title.title(titleComponent, subtitleComponent, titleTimes(fadeIn, stay, fadeOut)));
-            return true;
-        }
-
-        String legacyTitle = Text.legacySection(titleComponent);
-        String legacySubtitle = Text.legacySection(subtitleComponent);
+        String legacyTitle = legacySection(title);
+        String legacySubtitle = legacySection(subtitle);
         return sendTitleViaBukkit(player, legacyTitle, legacySubtitle, fadeIn, stay, fadeOut)
                 || sendTitleViaSimpleBukkit(player, legacyTitle, legacySubtitle)
                 || sendTitleViaLegacyPackets(player, legacyTitle, legacySubtitle, fadeIn, stay, fadeOut);
     }
 
-    public static Audience audience(Player player) {
-        return audience((CommandSender) player);
+    @Override
+    public void bossBar(Player player, String title, BossBarColor color, BossBarStyle style, float progress) {
+        if (player == null) {
+            return;
+        }
+        try {
+            Class<?> barColorClass = Class.forName("org.bukkit.boss.BarColor");
+            Class<?> barStyleClass = Class.forName("org.bukkit.boss.BarStyle");
+            Class<?> bossBarClass = Class.forName("org.bukkit.boss.BossBar");
+            Object barColor = Enum.valueOf((Class<Enum>) barColorClass.asSubclass(Enum.class), color.name());
+            Object barStyle = Enum.valueOf((Class<Enum>) barStyleClass.asSubclass(Enum.class), style.name());
+            Method createBossBar = Bukkit.class.getMethod("createBossBar", String.class, barColorClass, barStyleClass);
+            Object bossBar = createBossBar.invoke(null, legacySection(title), barColor, barStyle);
+            Method addPlayer = bossBarClass.getMethod("addPlayer", Player.class);
+            addPlayer.invoke(bossBar, player);
+            Method setProgress = bossBarClass.getMethod("setProgress", double.class);
+            setProgress.invoke(bossBar, Math.max(0.0, Math.min(1.0, progress)));
+            Method setVisible = bossBarClass.getMethod("setVisible", boolean.class);
+            setVisible.invoke(bossBar, true);
+        } catch (Throwable ignored) {
+            // BossBar API unavailable (pre-1.9); fall back to chat message.
+            send(player, title);
+        }
     }
 
-    public static Audience audience(CommandSender sender) {
-        if (sender == null) {
-            return null;
+    @Override
+    public String legacySection(String message) {
+        if (message == null || message.trim().isEmpty()) {
+            return "";
         }
-        if (sender instanceof Audience) {
-            return (Audience) sender;
-        }
-        if (bukkitAudiences != null) {
-            return bukkitAudiences.sender(sender);
-        }
-        return null;
+        BfComponent component = MiniMessageParser.parse(message);
+        return LegacySerializer.serialize(component);
     }
 
-    public static Audience console() {
-        return audience(Bukkit.getConsoleSender());
+    @Override
+    public String plain(String message) {
+        if (message == null || message.trim().isEmpty()) {
+            return "";
+        }
+        BfComponent component = MiniMessageParser.parse(message);
+        return PlainSerializer.serialize(component);
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -163,9 +130,9 @@ public class Messages {
 
     private static boolean sendActionBarViaLegacyPacket(Player player, String message) {
         try {
-            Class<?> chatComponentText = Reflection.nmsClass("ChatComponentText");
-            Class<?> iChatBaseComponent = Reflection.nmsClass("IChatBaseComponent");
-            Class<?> packetPlayOutChat = Reflection.nmsClass("PacketPlayOutChat");
+            Class<?> chatComponentText = nmsClass("ChatComponentText");
+            Class<?> iChatBaseComponent = nmsClass("IChatBaseComponent");
+            Class<?> packetPlayOutChat = nmsClass("PacketPlayOutChat");
             if (chatComponentText == null || iChatBaseComponent == null || packetPlayOutChat == null) {
                 return false;
             }
@@ -173,7 +140,7 @@ public class Messages {
             Object component = chatComponentText.getConstructor(String.class).newInstance(message);
             Constructor<?> constructor = packetPlayOutChat.getConstructor(iChatBaseComponent, byte.class);
             Object packet = constructor.newInstance(component, (byte) 2);
-            return Reflection.sendPacket(player, packet);
+            return sendPacket(player, packet);
         } catch (Throwable ignored) {
             return false;
         }
@@ -202,10 +169,10 @@ public class Messages {
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static boolean sendTitleViaLegacyPackets(Player player, String title, String subtitle, int fadeIn, int stay, int fadeOut) {
         try {
-            Class<?> chatComponentText = Reflection.nmsClass("ChatComponentText");
-            Class<?> iChatBaseComponent = Reflection.nmsClass("IChatBaseComponent");
-            Class<?> packetPlayOutTitle = Reflection.nmsClass("PacketPlayOutTitle");
-            Class<?> enumTitleAction = Reflection.nmsClass("PacketPlayOutTitle$EnumTitleAction");
+            Class<?> chatComponentText = nmsClass("ChatComponentText");
+            Class<?> iChatBaseComponent = nmsClass("IChatBaseComponent");
+            Class<?> packetPlayOutTitle = nmsClass("PacketPlayOutTitle");
+            Class<?> enumTitleAction = nmsClass("PacketPlayOutTitle$EnumTitleAction");
             if (chatComponentText == null || iChatBaseComponent == null || packetPlayOutTitle == null || enumTitleAction == null) {
                 return false;
             }
@@ -219,14 +186,14 @@ public class Messages {
             Constructor<?> timesConstructor = packetPlayOutTitle.getConstructor(enumTitleAction, iChatBaseComponent, int.class, int.class, int.class);
 
             Object emptyComponent = textConstructor.newInstance("");
-            Reflection.sendPacket(player, timesConstructor.newInstance(timesAction, emptyComponent, fadeIn, stay, fadeOut));
+            sendPacket(player, timesConstructor.newInstance(timesAction, emptyComponent, fadeIn, stay, fadeOut));
 
             if (!isBlank(title)) {
-                Reflection.sendPacket(player, messageConstructor.newInstance(titleAction, textConstructor.newInstance(title)));
+                sendPacket(player, messageConstructor.newInstance(titleAction, textConstructor.newInstance(title)));
             }
 
             if (!isBlank(subtitle)) {
-                Reflection.sendPacket(player, messageConstructor.newInstance(subtitleAction, textConstructor.newInstance(subtitle)));
+                sendPacket(player, messageConstructor.newInstance(subtitleAction, textConstructor.newInstance(subtitle)));
             }
             return true;
         } catch (Throwable ignored) {
@@ -234,26 +201,21 @@ public class Messages {
         }
     }
 
-    private static Title.Times titleTimes(int fadeIn, int stay, int fadeOut) {
-        Duration fadeInDuration = ticks(fadeIn);
-        Duration stayDuration = ticks(stay);
-        Duration fadeOutDuration = ticks(fadeOut);
+    private static Class<?> nmsClass(String name) {
         try {
-            return (Title.Times) Title.Times.class
-                    .getMethod("of", Duration.class, Duration.class, Duration.class)
-                    .invoke(null, fadeInDuration, stayDuration, fadeOutDuration);
+            return Class.forName("net.minecraft.server." + name);
         } catch (Throwable ignored) {
-            return Title.Times.times(fadeInDuration, stayDuration, fadeOutDuration);
+            return null;
         }
     }
 
-    private static Duration ticks(int ticks) {
-        return Duration.ofMillis(Math.max(0, ticks) * 50L);
-    }
-
-    private static boolean hasNativeAudience() {
+    private static boolean sendPacket(Player player, Object packet) {
         try {
-            return Bukkit.getConsoleSender() instanceof Audience;
+            Object handle = player.getClass().getMethod("getHandle").invoke(player);
+            Object connection = handle.getClass().getField("playerConnection").get(handle);
+            Method sendPacket = connection.getClass().getMethod("sendPacket", Class.forName("net.minecraft.server.Packet"));
+            sendPacket.invoke(connection, packet);
+            return true;
         } catch (Throwable ignored) {
             return false;
         }
