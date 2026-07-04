@@ -1,7 +1,7 @@
-package net.blueva.api.npc;
+package net.blueva.foundation.npc;
 
-import net.blueva.api.reflection.Reflection;
-import net.blueva.api.version.Version;
+import net.blueva.foundation.reflection.Reflection;
+import net.blueva.foundation.version.Version;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;

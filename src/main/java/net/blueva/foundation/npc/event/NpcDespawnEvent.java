@@ -1,6 +1,6 @@
-package net.blueva.api.npc.event;
+package net.blueva.foundation.npc.event;
 
-import net.blueva.api.npc.Npc;
+import net.blueva.foundation.npc.Npc;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;

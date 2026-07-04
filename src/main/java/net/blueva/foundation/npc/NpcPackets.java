@@ -1,14 +1,18 @@
-package net.blueva.api.npc;
+package net.blueva.foundation.npc;
 
-import net.blueva.api.reflection.Reflection;
-import net.blueva.api.version.Version;
+import net.blueva.foundation.npc.util.NpcPose;
+import net.blueva.foundation.reflection.Reflection;
+import net.blueva.foundation.version.Version;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -63,6 +67,8 @@ final class NpcPackets {
         Reflection.sendPacket(viewer, packet);
     }
 
+
+
     static void sendMetadata(Player viewer, Object serverPlayer) {
         if (serverPlayer == null) {
             return;
@@ -77,7 +83,8 @@ final class NpcPackets {
                         "net.minecraft.network.protocol.game.ClientboundSetEntityDataPacket");
                 Constructor<?> constructor = packetClass.getDeclaredConstructor(int.class, List.class);
                 constructor.setAccessible(true);
-                packet = constructor.newInstance(entityId, packedEntityData(dataWatcher));
+                List<?> packed = packedEntityData(dataWatcher);
+                packet = constructor.newInstance(entityId, packed);
             } else if (Version.isAtLeast(1, 9)) {
                 Class<?> packetClass = Reflection.nmsClass("PacketPlayOutEntityMetadata");
                 Constructor<?> constructor = packetClass.getDeclaredConstructor(int.class, getDataWatcherClass(), boolean.class);
@@ -156,6 +163,16 @@ final class NpcPackets {
         Reflection.sendPacket(viewer, packet);
     }
 
+    static void sendAddEntity(Player viewer, Object entityHandle) {
+        if (entityHandle == null || !Version.isAtLeast(1, 20)) {
+            return;
+        }
+        Object packet = newAddEntityPacket(entityHandle);
+        if (packet != null) {
+            Reflection.sendPacket(viewer, packet);
+        }
+    }
+
     static void sendDestroy(Player viewer, int entityId) {
         Object packet;
         if (Version.isAtLeast(1, 17)) {
@@ -166,12 +183,249 @@ final class NpcPackets {
         Reflection.sendPacket(viewer, packet);
     }
 
+    static void sendGlow(Player viewer, Object serverPlayer, boolean glowing) {
+        if (serverPlayer == null) {
+            return;
+        }
+        try {
+            Method setGlowingTag = findMethod(serverPlayer.getClass(), "setGlowingTag", boolean.class);
+            if (setGlowingTag != null) {
+                setGlowingTag.setAccessible(true);
+                setGlowingTag.invoke(serverPlayer, glowing);
+            } else {
+                setSharedFlag(serverPlayer, 5, glowing);
+            }
+        } catch (Throwable ignored) {
+            setSharedFlag(serverPlayer, 5, glowing);
+        }
+        sendMetadata(viewer, serverPlayer);
+    }
+
+    static void sendPose(Player viewer, Object serverPlayer, NpcPose pose) {
+        if (serverPlayer == null || pose == null) {
+            return;
+        }
+        setPose(serverPlayer, pose);
+        sendMetadata(viewer, serverPlayer);
+    }
+
+    static void sendScale(Player viewer, Object serverPlayer, double scale) {
+        if (serverPlayer == null || !Version.isAtLeast(1, 20, 6)) {
+            return;
+        }
+        try {
+            Object attributeInstance = getScaleAttribute(serverPlayer);
+            if (attributeInstance == null) {
+                return;
+            }
+            Method setBase = findMethod(attributeInstance.getClass(), "setBaseValue", double.class);
+            if (setBase != null) {
+                setBase.setAccessible(true);
+                setBase.invoke(attributeInstance, scale);
+            }
+
+            int entityId = intValue(serverPlayer, "getId");
+            Class<?> packetClass = Reflection.nmsClass("ClientboundUpdateAttributesPacket",
+                    "net.minecraft.network.protocol.game.ClientboundUpdateAttributesPacket");
+            if (packetClass == null) {
+                return;
+            }
+            List<Object> list = Collections.singletonList(attributeInstance);
+            Constructor<?> publicConstructor = null;
+            Constructor<?> fallbackConstructor = null;
+            for (Constructor<?> constructor : packetClass.getDeclaredConstructors()) {
+                constructor.setAccessible(true);
+                Class<?>[] params = constructor.getParameterTypes();
+                if (params.length == 2 && params[0] == int.class) {
+                    if (params[1] == Collection.class) {
+                        publicConstructor = constructor;
+                    } else if (Collection.class.isAssignableFrom(params[1]) && fallbackConstructor == null) {
+                        fallbackConstructor = constructor;
+                    }
+                }
+            }
+            Constructor<?> constructor = publicConstructor != null ? publicConstructor : fallbackConstructor;
+            if (constructor != null) {
+                Object packet = constructor.newInstance(entityId, list);
+                Reflection.sendPacket(viewer, packet);
+                return;
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    static void sendTeam(Player viewer, String teamName, String entry, org.bukkit.ChatColor color,
+                         org.bukkit.scoreboard.NameTagVisibility nameTagVisibility) {
+        try {
+            Class<?> packetClass = Reflection.nmsClass("ClientboundSetPlayerTeamPacket",
+                    "net.minecraft.network.protocol.game.ClientboundSetPlayerTeamPacket");
+            if (packetClass == null) {
+                return;
+            }
+
+            // Modern versions: static createAddOrModifyPacket(String name, String displayName,
+            // String prefix, String suffix, boolean friendlyFire, boolean seeFriendlyInvisibles,
+            // NameTagVisibility tagVisibility, CollisionRule collisionRule, EnumChatFormat color, Collection<String> players)
+            for (Method method : packetClass.getDeclaredMethods()) {
+                if (!method.getName().equals("createAddOrModifyPacket")) {
+                    continue;
+                }
+                Class<?>[] params = method.getParameterTypes();
+                if (params.length >= 10) {
+                    method.setAccessible(true);
+                    Class<?> nameTagVisibilityClass = Reflection.nmsClass("Team$Visibility",
+                            "net.minecraft.world.scores.ScoreboardTeamBase$EnumNameTagVisibility");
+                    Class<?> collisionRuleClass = Reflection.nmsClass("Team$CollisionRule",
+                            "net.minecraft.world.scores.ScoreboardTeamBase$EnumTeamPush");
+                    Class<?> chatFormatClass = Reflection.nmsClass("ChatFormatting", "net.minecraft.ChatFormatting");
+                    Object nmsVisibility = enumByName(nameTagVisibilityClass,
+                            nameTagVisibility == org.bukkit.scoreboard.NameTagVisibility.ALWAYS ? "ALWAYS" : "NEVER");
+                    Object nmsCollision = enumByName(collisionRuleClass, "ALWAYS");
+                    Object nmsColor = enumByName(chatFormatClass, color == null ? "WHITE" : color.name());
+                    Object packet = method.invoke(null, teamName, teamName, "", "", false, false,
+                            nmsVisibility, nmsCollision, nmsColor, Collections.singletonList(entry));
+                    Reflection.sendPacket(viewer, packet);
+                    return;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static Object enumByName(Class<?> enumClass, String name) {
+        if (enumClass == null || name == null) {
+            return null;
+        }
+        try {
+            return Enum.valueOf(enumClass.asSubclass(Enum.class), name);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static Object getScaleAttribute(Object serverPlayer) {
+        try {
+            Class<?> attributesClass = Reflection.findClass("net.minecraft.world.entity.ai.attributes.Attributes");
+            if (attributesClass == null) {
+                return null;
+            }
+            Field scaleField = findField(attributesClass, "SCALE");
+            if (scaleField == null) {
+                return null;
+            }
+            scaleField.setAccessible(true);
+            Object scaleAttribute = scaleField.get(null);
+            if (scaleAttribute == null) {
+                return null;
+            }
+            for (Method method : serverPlayer.getClass().getMethods()) {
+                if (!method.getName().equals("getAttribute") || method.getParameterCount() != 1) {
+                    continue;
+                }
+                method.setAccessible(true);
+                Object instance = method.invoke(serverPlayer, scaleAttribute);
+                if (instance != null) {
+                    return instance;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
+    }
+
+    private static void setSharedFlag(Object serverPlayer, int flagIndex, boolean value) {
+        try {
+            Object dataWatcher = invokeEither(serverPlayer, "getEntityData", "getDataWatcher");
+            Class<?> entityClass = Reflection.findClass("net.minecraft.world.entity.Entity");
+            if (entityClass == null) {
+                return;
+            }
+            Field accessorField = findField(entityClass, "DATA_SHARED_FLAGS_ID");
+            if (accessorField == null) {
+                return;
+            }
+            accessorField.setAccessible(true);
+            Object accessor = accessorField.get(null);
+            if (accessor == null) {
+                return;
+            }
+            Method get = findMethod(dataWatcher.getClass(), "get", accessor.getClass());
+            if (get == null) {
+                return;
+            }
+            get.setAccessible(true);
+            Byte current = (Byte) get.invoke(dataWatcher, accessor);
+            byte bits = current == null ? 0 : current;
+            int flag = 1 << flagIndex;
+            byte newBits = value ? (byte) (bits | flag) : (byte) (bits & ~flag);
+            Method set = findMethod(dataWatcher.getClass(), "set", accessor.getClass(), Object.class);
+            if (set == null) {
+                return;
+            }
+            set.setAccessible(true);
+            set.invoke(dataWatcher, accessor, newBits);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void setPose(Object serverPlayer, NpcPose pose) {
+        try {
+            Object dataWatcher = invokeEither(serverPlayer, "getEntityData", "getDataWatcher");
+            Class<?> entityClass = Reflection.findClass("net.minecraft.world.entity.Entity");
+            if (entityClass == null) {
+                return;
+            }
+            Field accessorField = findField(entityClass, "DATA_POSE");
+            if (accessorField == null) {
+                accessorField = findField(Reflection.findClass("net.minecraft.world.entity.LivingEntity"), "DATA_POSE");
+            }
+            if (accessorField == null) {
+                return;
+            }
+            accessorField.setAccessible(true);
+            Object accessor = accessorField.get(null);
+            if (accessor == null) {
+                return;
+            }
+            Class<?> poseClass = Reflection.findClass("net.minecraft.world.entity.Pose");
+            if (poseClass == null) {
+                return;
+            }
+            Object nmsPose = Enum.valueOf(poseClass.asSubclass(Enum.class), pose.name());
+            Method set = findMethod(dataWatcher.getClass(), "set", accessor.getClass(), Object.class);
+            if (set == null) {
+                return;
+            }
+            set.setAccessible(true);
+            set.invoke(dataWatcher, accessor, nmsPose);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static Field findField(Class<?> clazz, String name) {
+        while (clazz != null && clazz != Object.class) {
+            try {
+                return clazz.getDeclaredField(name);
+            } catch (NoSuchFieldException ignored) {
+                clazz = clazz.getSuperclass();
+            }
+        }
+        return null;
+    }
+
     private static Object newModernInfoAdd(Object serverPlayer) {
         try {
             Class<?> packetClass = Reflection.nmsClass("ClientboundPlayerInfoUpdatePacket",
                     "net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket");
             if (packetClass == null) {
                 return null;
+            }
+            // Paper 1.21.5+ added createSinglePlayerInitializing which respects the listed flag.
+            try {
+                Method method = packetClass.getMethod("createSinglePlayerInitializing", serverPlayer.getClass(), boolean.class);
+                method.setAccessible(true);
+                return method.invoke(null, serverPlayer, false);
+            } catch (NoSuchMethodException ignored) {
             }
             Method method = packetClass.getMethod("createPlayerInitializing", java.util.Collection.class);
             method.setAccessible(true);
@@ -285,6 +539,23 @@ final class NpcPackets {
     }
 
     private static Object newModernSpawnPacket(Object serverPlayer) {
+        return newAddEntityPacket(serverPlayer);
+    }
+
+    private static Object newAddEntityPacket(Object entityHandle) {
+        // 1.21+ requires a ServerEntity when building the spawn packet for some
+        // entity types (especially hostile mobs), so try that first.
+        if (Version.isAtLeast(1, 21)) {
+            Object packet = newAddEntityPacketWithServerEntity(entityHandle);
+            if (packet != null) {
+                return packet;
+            }
+        }
+        Object built = invokeNoArg(entityHandle, "getAddEntityPacket");
+        if (built != null) {
+            return built;
+        }
+        // Fallback: build a generic ClientboundAddEntityPacket manually.
         try {
             Class<?> packetClass = Reflection.nmsClass("ClientboundAddEntityPacket",
                     "net.minecraft.network.protocol.game.ClientboundAddEntityPacket");
@@ -299,20 +570,159 @@ final class NpcPackets {
                     entityTypeClass, int.class, vec3Class, double.class);
             constructor.setAccessible(true);
             return constructor.newInstance(
-                    intValue(serverPlayer, "getId"),
-                    uuidValue(serverPlayer),
-                    doubleValue(serverPlayer, "getX"),
-                    doubleValue(serverPlayer, "getY"),
-                    doubleValue(serverPlayer, "getZ"),
-                    floatValue(serverPlayer, "getXRot"),
-                    floatValue(serverPlayer, "getYRot"),
-                    invokeNoArg(serverPlayer, "getType"),
+                    intValue(entityHandle, "getId"),
+                    uuidValue(entityHandle),
+                    doubleValue(entityHandle, "getX"),
+                    doubleValue(entityHandle, "getY"),
+                    doubleValue(entityHandle, "getZ"),
+                    floatValue(entityHandle, "getXRot"),
+                    floatValue(entityHandle, "getYRot"),
+                    invokeNoArg(entityHandle, "getType"),
                     0,
-                    vec3Value(serverPlayer),
-                    (double) floatValue(serverPlayer, "getYRot"));
+                    vec3Value(entityHandle),
+                    (double) floatValue(entityHandle, "getYRot"));
         } catch (Throwable ignored) {
             return null;
         }
+    }
+
+    private static Object newAddEntityPacketWithServerEntity(Object entityHandle) {
+        try {
+            Object level = invokeNoArg(entityHandle, "level");
+            if (level == null) {
+                return null;
+            }
+            Class<?> serverEntityClass = Reflection.findClass("net.minecraft.server.level.ServerEntity");
+            if (serverEntityClass == null) {
+                return null;
+            }
+            Object serverEntity = createServerEntity(level, entityHandle, serverEntityClass);
+            if (serverEntity == null) {
+                return null;
+            }
+            Class<?> packetClass = Reflection.nmsClass("ClientboundAddEntityPacket",
+                    "net.minecraft.network.protocol.game.ClientboundAddEntityPacket");
+            if (packetClass == null) {
+                return null;
+            }
+            Constructor<?> constructor = findAddEntityPacketConstructor(packetClass, entityHandle.getClass(), serverEntityClass);
+            if (constructor == null) {
+                return null;
+            }
+            constructor.setAccessible(true);
+            if (constructor.getParameterCount() == 2) {
+                return constructor.newInstance(entityHandle, serverEntity);
+            } else {
+                return constructor.newInstance(entityHandle, serverEntity, 0);
+            }
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static Constructor<?> findAddEntityPacketConstructor(Class<?> packetClass, Class<?> handleClass, Class<?> serverEntityClass) {
+        Class<?> entityClass = Reflection.findClass("net.minecraft.world.entity.Entity");
+        for (Constructor<?> constructor : packetClass.getDeclaredConstructors()) {
+            Class<?>[] params = constructor.getParameterTypes();
+            if (params.length < 2 || params.length > 3) {
+                continue;
+            }
+            if (!isAssignable(params[0], entityClass == null ? Object.class : entityClass)) {
+                continue;
+            }
+            if (!isAssignable(params[1], serverEntityClass)) {
+                continue;
+            }
+            if (params.length == 3 && !isAssignable(params[2], int.class)) {
+                continue;
+            }
+            return constructor;
+        }
+        return null;
+    }
+
+    private static Object createServerEntity(Object level, Object entityHandle, Class<?> serverEntityClass) {
+        try {
+            Class<?> entityClass = Reflection.findClass("net.minecraft.world.entity.Entity");
+            Class<?> serverLevelClass = Reflection.findClass("net.minecraft.server.level.ServerLevel");
+            if (entityClass == null || serverLevelClass == null) {
+                return null;
+            }
+            for (Constructor<?> constructor : serverEntityClass.getDeclaredConstructors()) {
+                Class<?>[] params = constructor.getParameterTypes();
+                if (params.length < 5 || params.length > 6) {
+                    continue;
+                }
+                if (!isAssignable(params[0], serverLevelClass)) {
+                    continue;
+                }
+                if (!isAssignable(params[1], entityClass)) {
+                    continue;
+                }
+                if (!isAssignable(params[2], int.class)) {
+                    continue;
+                }
+                if (!isAssignable(params[3], boolean.class)) {
+                    continue;
+                }
+                Object fifthArg;
+                if (isAssignable(Class.forName("java.util.function.Consumer"), params[4])) {
+                    fifthArg = (java.util.function.Consumer<Object>) packet -> {};
+                } else if (params[4].isInterface()) {
+                    fifthArg = Proxy.newProxyInstance(params[4].getClassLoader(), new Class<?>[]{params[4]},
+                            (proxy, method, args) -> null);
+                } else {
+                    continue;
+                }
+                Object[] args = new Object[params.length];
+                args[0] = level;
+                args[1] = entityHandle;
+                args[2] = 0;
+                args[3] = false;
+                args[4] = fifthArg;
+                if (params.length == 6) {
+                    if (!java.util.Set.class.isAssignableFrom(params[5])) {
+                        continue;
+                    }
+                    args[5] = java.util.Collections.emptySet();
+                }
+                constructor.setAccessible(true);
+                return constructor.newInstance(args);
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
+    }
+
+    private static boolean isAssignable(Class<?> to, Class<?> from) {
+        if (to == null || from == null) {
+            return false;
+        }
+        if (to.isPrimitive() || from.isPrimitive()) {
+            if (to == int.class || to == Integer.class) {
+                return from == int.class || from == Integer.class;
+            }
+            if (to == boolean.class || to == Boolean.class) {
+                return from == boolean.class || from == Boolean.class;
+            }
+            if (to == double.class || to == Double.class) {
+                return from == double.class || from == Double.class;
+            }
+            if (to == float.class || to == Float.class) {
+                return from == float.class || from == Float.class;
+            }
+            if (to == long.class || to == Long.class) {
+                return from == long.class || from == Long.class;
+            }
+            if (to == byte.class || to == Byte.class) {
+                return from == byte.class || from == Byte.class;
+            }
+            if (to == short.class || to == Short.class) {
+                return from == short.class || from == Short.class;
+            }
+            return to == from;
+        }
+        return to.isAssignableFrom(from);
     }
 
     private static Object newModernTeleport(Object serverPlayer) {

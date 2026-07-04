@@ -1,4 +1,4 @@
-package net.blueva.api.npc.util;
+package net.blueva.foundation.npc.util;
 
 /**
  * Poses supported by player NPCs.

@@ -1,12 +1,13 @@
-package net.blueva.api.npc;
+package net.blueva.foundation.npc;
 
 import org.bukkit.Location;
+import org.bukkit.entity.EntityType;
 import org.bukkit.plugin.Plugin;
 
 import java.util.UUID;
 
 /**
- * Public entry point for the BlueAPI NPC module.
+ * Public entry point for the BlueFoundation NPC module.
  */
 public class NPCs {
 
@@ -83,9 +84,22 @@ public class NPCs {
      * @return the created NPC
      */
     public static Npc create(Location location, UUID uuid, String name) {
+        return create(location, uuid, name, EntityType.PLAYER);
+    }
+
+    /**
+     * Creates a new NPC at the given location with a specific entity type.
+     *
+     * @param location   the spawn location
+     * @param uuid       the UUID to use
+     * @param name       the display name
+     * @param entityType the Bukkit entity type to display (PLAYER for a human NPC)
+     * @return the created NPC
+     */
+    public static Npc create(Location location, UUID uuid, String name, EntityType entityType) {
         ensureInitialized();
         String internalName = internalName(uuid, name);
-        NpcImpl npc = new NpcImpl(location, uuid, internalName);
+        NpcImpl npc = new NpcImpl(location, uuid, internalName, entityType);
         npc.name(name);
         NpcRegistry.register(npc);
         return npc;
@@ -101,7 +115,7 @@ public class NPCs {
 
     private static void ensureInitialized() {
         if (manager == null) {
-            throw new IllegalStateException("BlueAPI.NPCs is not initialized. Call BlueAPI.NPCs.init(plugin) first.");
+            throw new IllegalStateException("BlueFoundation.NPCs is not initialized. Call BlueFoundation.NPCs.init(plugin) first.");
         }
     }
 }

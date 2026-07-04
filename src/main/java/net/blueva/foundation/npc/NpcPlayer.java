@@ -1,8 +1,8 @@
-package net.blueva.api.npc;
+package net.blueva.foundation.npc;
 
 import com.mojang.authlib.GameProfile;
-import net.blueva.api.reflection.Reflection;
-import net.blueva.api.version.Version;
+import net.blueva.foundation.reflection.Reflection;
+import net.blueva.foundation.version.Version;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -22,23 +22,42 @@ import java.util.UUID;
 final class NpcPlayer {
 
     private final Object handle;
+    private final UUID uuid;
+    private final String internalName;
 
-    private NpcPlayer(Object handle) {
+    private NpcPlayer(Object handle, UUID uuid, String internalName) {
         this.handle = handle;
+        this.uuid = uuid;
+        this.internalName = internalName;
     }
 
     Object getHandle() {
         return handle;
     }
 
-    static NpcPlayer create(UUID uuid, String internalName, Location location, NpcConnection connection) {
-        Object serverPlayer = Version.isAtLeast(1, 17)
-                ? createModern(uuid, internalName, location, connection)
-                : createLegacy(uuid, internalName, location, connection);
-        return new NpcPlayer(serverPlayer);
+    String getInternalName() {
+        return internalName;
     }
 
-    private static Object createModern(UUID uuid, String internalName, Location location, NpcConnection connection) {
+    static NpcPlayer create(UUID uuid, String internalName, Location location, NpcConnection connection) {
+        return create(uuid, internalName, location, connection, null);
+    }
+
+    static NpcPlayer create(UUID uuid, String internalName, Location location, NpcConnection connection, Skin skin) {
+        Object serverPlayer = Version.isAtLeast(1, 17)
+                ? createModern(uuid, internalName, location, connection, skin)
+                : createLegacy(uuid, internalName, location, connection, skin);
+        return new NpcPlayer(serverPlayer, uuid, internalName);
+    }
+
+    NpcPlayer recreate(Location location, NpcConnection connection, Skin skin) {
+        Object serverPlayer = Version.isAtLeast(1, 17)
+                ? createModern(uuid, internalName, location, connection, skin)
+                : createLegacy(uuid, internalName, location, connection, skin);
+        return new NpcPlayer(serverPlayer, uuid, internalName);
+    }
+
+    private static Object createModern(UUID uuid, String internalName, Location location, NpcConnection connection, Skin skin) {
         try {
             Object server = getMinecraftServer();
             Object level = getServerLevel(location.getWorld());
@@ -47,6 +66,11 @@ final class NpcPlayer {
             }
 
             GameProfile profile = new GameProfile(uuid, internalName);
+            Object appliedProfile = Skin.apply(profile, skin);
+            if (appliedProfile instanceof GameProfile) {
+                profile = (GameProfile) appliedProfile;
+            }
+
             Class<?> serverPlayerClass = Reflection.nmsClass("ServerPlayer", "net.minecraft.server.level.ServerPlayer");
             Class<?> clientInfoClass = Reflection.findClass("net.minecraft.server.level.ClientInformation");
             Object clientInfo = createDefaultClientInformation(clientInfoClass);
@@ -64,6 +88,7 @@ final class NpcPlayer {
             Object serverPlayer = constructor.newInstance(server, level, profile, clientInfo);
 
             createAndSetPacketListener(serverPlayer, connection, profile);
+            setField(serverPlayer, "listed", false);
             setLocation(serverPlayer, location);
             return serverPlayer;
         } catch (Throwable ignored) {
@@ -71,7 +96,7 @@ final class NpcPlayer {
         }
     }
 
-    private static Object createLegacy(UUID uuid, String internalName, Location location, NpcConnection connection) {
+    private static Object createLegacy(UUID uuid, String internalName, Location location, NpcConnection connection, Skin skin) {
         try {
             Object server = getMinecraftServer();
             Object level = getServerLevel(location.getWorld());
@@ -80,6 +105,11 @@ final class NpcPlayer {
             }
 
             GameProfile profile = new GameProfile(uuid, internalName);
+            Object appliedProfile = Skin.apply(profile, skin);
+            if (appliedProfile instanceof GameProfile) {
+                profile = (GameProfile) appliedProfile;
+            }
+
             Class<?> entityPlayerClass = Reflection.nmsClass("EntityPlayer");
             Class<?> interactManagerClass = Reflection.nmsClass("PlayerInteractManager");
             if (entityPlayerClass == null || interactManagerClass == null) {

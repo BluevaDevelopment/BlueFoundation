@@ -1,9 +1,11 @@
-package net.blueva.api.npc;
+package net.blueva.foundation.npc;
 
-import net.blueva.api.npc.event.NpcClickEvent;
-import net.blueva.api.npc.util.NpcAnimation;
-import net.blueva.api.npc.util.NpcPose;
+import net.blueva.foundation.npc.event.NpcClickEvent;
+import net.blueva.foundation.npc.util.NpcAnimation;
+import net.blueva.foundation.npc.util.NpcPose;
+import org.bukkit.ChatColor;
 import org.bukkit.Location;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
@@ -25,6 +27,12 @@ public interface Npc {
 
     void teleport(Location location);
 
+    Npc entityType(EntityType type);
+
+    EntityType getEntityType();
+
+    double getHeight();
+
     String getName();
 
     Npc name(String name);
@@ -43,7 +51,33 @@ public interface Npc {
 
     Npc pose(NpcPose pose);
 
+    NpcPose getPose();
+
     Npc lookAt(Player target);
+
+    Npc lookAtClosestPlayer(boolean enabled);
+
+    Npc lookAtClosestPlayer(boolean enabled, double range);
+
+    boolean isLookingAtClosestPlayer();
+
+    Npc glow(ChatColor color);
+
+    Npc glow(boolean glow);
+
+    ChatColor getGlowColor();
+
+    Npc scale(double scale);
+
+    double getScale();
+
+    Npc nameVisible(boolean visible);
+
+    boolean isNameVisible();
+
+    Npc listed(boolean listed);
+
+    boolean isListed();
 
     Npc animate(NpcAnimation animation);
 

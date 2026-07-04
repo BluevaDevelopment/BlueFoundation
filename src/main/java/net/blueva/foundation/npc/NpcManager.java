@@ -1,4 +1,4 @@
-package net.blueva.api.npc;
+package net.blueva.foundation.npc;
 
 import org.bukkit.Bukkit;
 import org.bukkit.event.EventHandler;
@@ -16,19 +16,29 @@ import java.util.List;
  */
 final class NpcManager implements Listener {
 
-    private final Plugin plugin;
+    private static Plugin plugin;
+    private static int lookAtTaskId = -1;
 
     NpcManager(Plugin plugin) {
-        this.plugin = plugin;
+        NpcManager.plugin = plugin;
+    }
+
+    static Plugin getPlugin() {
+        return plugin;
     }
 
     void enable() {
         Bukkit.getPluginManager().registerEvents(this, plugin);
         NpcPacketListener.injectAll();
+        startLookAtTask();
     }
 
     void disable() {
         HandlerList.unregisterAll(this);
+        if (lookAtTaskId != -1) {
+            Bukkit.getScheduler().cancelTask(lookAtTaskId);
+            lookAtTaskId = -1;
+        }
         List<NpcImpl> copy = new ArrayList<>(NpcRegistry.all());
         for (NpcImpl npc : copy) {
             npc.destroy();
@@ -37,9 +47,21 @@ final class NpcManager implements Listener {
         NpcPacketListener.uninjectAll();
     }
 
+    private static void startLookAtTask() {
+        lookAtTaskId = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            for (NpcImpl npc : NpcRegistry.all()) {
+                try {
+                    npc.updateLookAt();
+                } catch (Throwable ignored) {
+                }
+            }
+        }, 10L, 5L).getTaskId();
+    }
+
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
-        NpcPacketListener.inject(event.getPlayer());
+        final org.bukkit.entity.Player player = event.getPlayer();
+        Bukkit.getScheduler().runTaskLater(plugin, () -> NpcPacketListener.inject(player), 5L);
     }
 
     @EventHandler

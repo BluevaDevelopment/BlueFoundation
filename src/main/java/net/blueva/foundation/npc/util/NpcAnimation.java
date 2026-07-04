@@ -1,4 +1,4 @@
-package net.blueva.api.npc.util;
+package net.blueva.foundation.npc.util;
 
 /**
  * Animations that can be played on a player NPC.

@@ -1,4 +1,4 @@
-package net.blueva.api.npc;
+package net.blueva.foundation.npc;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -24,6 +24,11 @@ final class NpcRegistry {
     static void unregister(NpcImpl npc) {
         BY_UUID.remove(npc.getUuid());
         BY_ENTITY_ID.remove(npc.getEntityId());
+    }
+
+    static void updateEntityId(NpcImpl npc, int oldEntityId) {
+        BY_ENTITY_ID.remove(oldEntityId);
+        BY_ENTITY_ID.put(npc.getEntityId(), npc);
     }
 
     static NpcImpl byUuid(UUID uuid) {
