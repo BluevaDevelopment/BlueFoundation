@@ -370,7 +370,7 @@ YAML uses conservative YAML 1.2-style booleans, so only `true` and `false` are p
 
 `BlueFoundation.NPCs` creates packet-based player NPCs that work across Bukkit/Spigot/Paper versions without depending on versioned NMS package names. It builds a fake `ServerPlayer`/`EntityPlayer` internally and sends spawn, equipment, teleport, animation and destroy packets only to selected viewers.
 
-This approach avoids the `ArrayIndexOutOfBoundsException` that affects NpcApi on modern Paper versions, because version detection is handled by `BlueFoundation.Version` instead of parsing `Bukkit.getServer().getClass().getPackage().getName()`.
+This approach avoids version-detection issues on modern Paper servers, because version detection is handled by `BlueFoundation.Version` instead of parsing `Bukkit.getServer().getClass().getPackage().getName()`.
 
 > **Status:** usable MVP. Core features are implemented and the module compiles, but it has not yet been battle-tested on every modern Paper build. Feedback from real servers is welcome.
 
