@@ -56,7 +56,7 @@ It downloads Maven artifacts into the plugin's `libraries` folder and injects th
 
 ```java
 BlueFoundation.Dependencies.load(this, BlueFoundation.Dependencies.list(
-        BlueFoundation.Dependencies.jitPack("com.github.Eisi05", "NpcApi", "2.2.2")
+        BlueFoundation.Dependencies.mavenCentral("com.zaxxer", "HikariCP", "4.0.3")
 ));
 ```
 
@@ -64,10 +64,10 @@ You can also create dependency descriptors directly:
 
 ```java
 BlueFoundation.Dependencies.RuntimeDependency dependency = new BlueFoundation.Dependencies.RuntimeDependency(
-        "com.github.Eisi05",
-        "NpcApi",
-        "2.2.2",
-        BlueFoundation.Dependencies.Repositories.JITPACK
+        "com.zaxxer",
+        "HikariCP",
+        "4.0.3",
+        BlueFoundation.Dependencies.Repositories.MAVEN_CENTRAL
 );
 
 BlueFoundation.Dependencies.loader(this).load(dependency);
@@ -75,37 +75,16 @@ BlueFoundation.Dependencies.loader(this).load(dependency);
 
 ### Adventure runtime
 
-BlueFoundation and Blueva plugins use Adventure + MiniMessage for text, not `ChatColor`.
+BlueFoundation parses MiniMessage and serializes to legacy strings internally, so `BlueFoundation.Text` and `BlueFoundation.Messages` work without installing Adventure at runtime.
+
+`BlueFoundation.Dependencies.loadAdventure(plugin)` is kept for backwards compatibility but is now a no-op. You do not need to load Adventure libraries manually.
 
 Rules:
 
 - Author user-facing text as MiniMessage.
-- Use Adventure `Component` internally for text-aware APIs.
+- Use Adventure `Component` internally for text-aware APIs when you already have one.
 - Serialize to legacy strings only at Bukkit boundaries that still require strings.
 - Keep legacy `&` color support only as compatibility input.
-
-Call the Adventure runtime profile before using `BlueFoundation.Text` or `BlueFoundation.Messages` on servers that may not provide Adventure natively:
-
-```java
-@Override
-public void onLoad() {
-    BlueFoundation.Dependencies.loadAdventure(this);
-}
-
-@Override
-public void onEnable() {
-    BlueFoundation.Messages.init(this);
-}
-
-@Override
-public void onDisable() {
-    BlueFoundation.Messages.close();
-}
-```
-
-Paper servers with native Adventure audiences do not need `adventure-platform-bukkit`; Spigot/Bukkit servers get the required Adventure libraries through the runtime dependency loader.
-
-The Bukkit Adventure platform targets Paper, Spigot, and Bukkit across old and modern Minecraft versions. BlueFoundation still compiles against Java 8 / Spigot API 1.8.8, so it compiles against the latest Java-8-compatible Adventure 4.x line. Runtime loading is not hard-capped to that line: modern Java 21 + Minecraft 1.21+ Spigot/Bukkit profiles can inject Adventure 5.x core artifacts while the Bukkit platform bridge stays on its own 4.x line.
 
 ## Version utilities
 
