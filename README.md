@@ -46,6 +46,7 @@ BlueFoundation.Text
 BlueFoundation.Events
 BlueFoundation.Configs
 BlueFoundation.NPCs
+BlueFoundation.Scoreboards
 ```
 
 ## Runtime dependencies
