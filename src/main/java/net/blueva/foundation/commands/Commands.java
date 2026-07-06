@@ -1,6 +1,6 @@
-package net.blueva.api.commands;
+package net.blueva.foundation.commands;
 
-import net.blueva.api.messages.Messages;
+import net.blueva.foundation.messages.Messages;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
