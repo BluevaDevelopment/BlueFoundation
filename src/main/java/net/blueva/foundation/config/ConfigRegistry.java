@@ -39,13 +39,27 @@ public final class ConfigRegistry {
     }
 
     public boolean register(String fileName) {
+        return register(fileName, ConfigUpdatePolicy.MERGE_DEFAULTS);
+    }
+
+    public boolean register(String fileName, ConfigUpdatePolicy updatePolicy) {
+        if (updatePolicy == null) {
+            updatePolicy = ConfigUpdatePolicy.MERGE_DEFAULTS;
+        }
+        if (updatePolicy == ConfigUpdatePolicy.COPY_DEFAULTS_ONLY) {
+            try {
+                return registerCopyOnly(fileName);
+            } catch (IOException exception) {
+                return false;
+            }
+        }
         if (entries.containsKey(fileName)) {
             return true;
         }
         if (resourceStream(fileName) == null) {
             return false;
         }
-        ConfigFile config = Configs.load(dataFolder, mappedClassLoader(fileName), fileName, format);
+        ConfigFile config = Configs.load(dataFolder, mappedClassLoader(fileName), fileName, format, updatePolicy);
         entries.put(fileName, new UpdatingEntry(config));
         return true;
     }

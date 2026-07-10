@@ -19,6 +19,7 @@ public class ConfigFile {
     private final ConfigCodec codec;
     private final ConfigDocument defaults;
     private final Set<String> adoptedCustomPaths;
+    private final ConfigUpdatePolicy updatePolicy;
     private ConfigDocument document;
 
     ConfigFile(Path file, Path cacheFile, ConfigCodec codec, ConfigDocument defaults, ConfigDocument document) {
@@ -26,6 +27,10 @@ public class ConfigFile {
     }
 
     ConfigFile(Path file, Path cacheFile, ConfigCodec codec, ConfigDocument defaults, ConfigDocument document, Set<String> adoptedCustomPaths) {
+        this(file, cacheFile, codec, defaults, document, adoptedCustomPaths, ConfigUpdatePolicy.MERGE_DEFAULTS);
+    }
+
+    ConfigFile(Path file, Path cacheFile, ConfigCodec codec, ConfigDocument defaults, ConfigDocument document, Set<String> adoptedCustomPaths, ConfigUpdatePolicy updatePolicy) {
         this.file = file;
         this.cacheFile = cacheFile;
         this.codec = codec;
@@ -34,6 +39,7 @@ public class ConfigFile {
         this.adoptedCustomPaths = adoptedCustomPaths == null
                 ? Collections.<String>emptySet()
                 : new HashSet<String>(adoptedCustomPaths);
+        this.updatePolicy = updatePolicy == null ? ConfigUpdatePolicy.MERGE_DEFAULTS : updatePolicy;
     }
 
     public Path file() {
@@ -46,6 +52,10 @@ public class ConfigFile {
 
     public ConfigDocument document() {
         return document;
+    }
+
+    public ConfigUpdatePolicy updatePolicy() {
+        return updatePolicy;
     }
 
     public boolean contains(String path) {
@@ -266,10 +276,15 @@ public class ConfigFile {
 
     public void save() throws IOException {
         save(true);
-        saveCache();
+        if (updatePolicy == ConfigUpdatePolicy.MERGE_DEFAULTS) {
+            saveCache();
+        }
     }
 
     public void update() throws IOException {
+        if (updatePolicy == ConfigUpdatePolicy.COPY_DEFAULTS_ONLY) {
+            return;
+        }
         String before = Files.exists(file) ? ConfigIO.read(file) : "";
         ConfigCache cache = Files.exists(cacheFile) ? ConfigCache.read(ConfigIO.read(cacheFile)) : new ConfigCache();
         for (Map.Entry<String, ConfigNode> entry : defaults.nodes().entrySet()) {

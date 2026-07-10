@@ -25,13 +25,21 @@ public class Configs {
     }
 
     public static ConfigFile load(JavaPlugin plugin, String resourceName, ConfigFormat format) {
+        return load(plugin, resourceName, format, ConfigUpdatePolicy.MERGE_DEFAULTS);
+    }
+
+    public static ConfigFile load(JavaPlugin plugin, String resourceName, ConfigFormat format, ConfigUpdatePolicy updatePolicy) {
         if (plugin == null) {
             throw new IllegalArgumentException("plugin cannot be null");
         }
-        return load(plugin.getDataFolder().toPath(), plugin.getClass().getClassLoader(), resourceName, format);
+        return load(plugin.getDataFolder().toPath(), plugin.getClass().getClassLoader(), resourceName, format, updatePolicy);
     }
 
     public static ConfigFile load(Path dataFolder, ClassLoader classLoader, String resourceName, ConfigFormat format) {
+        return load(dataFolder, classLoader, resourceName, format, ConfigUpdatePolicy.MERGE_DEFAULTS);
+    }
+
+    public static ConfigFile load(Path dataFolder, ClassLoader classLoader, String resourceName, ConfigFormat format, ConfigUpdatePolicy updatePolicy) {
         if (dataFolder == null) {
             throw new IllegalArgumentException("dataFolder cannot be null");
         }
@@ -44,6 +52,7 @@ public class Configs {
         ConfigCodec codec = ConfigCodecs.of(format);
         Path file = dataFolder.resolve(resourceName);
         Path cache = dataFolder.resolve(".bluefoundation").resolve("config-cache").resolve(safeCacheName(resourceName));
+        ConfigUpdatePolicy normalizedPolicy = normalizeUpdatePolicy(updatePolicy);
 
         try {
             String defaultText = resource(classLoader, resourceName);
@@ -54,10 +63,10 @@ public class Configs {
                 ConfigIO.writeAtomic(file, codec.write(defaults));
             }
             ConfigDocument document = codec.read(ConfigIO.read(file));
-            Set<String> adoptedCustomPaths = existedBeforeLoad && !cacheExistedBeforeLoad
+            Set<String> adoptedCustomPaths = normalizedPolicy == ConfigUpdatePolicy.MERGE_DEFAULTS && existedBeforeLoad && !cacheExistedBeforeLoad
                     ? changedExistingPaths(document, defaults)
                     : new HashSet<String>();
-            ConfigFile config = new ConfigFile(file, cache, codec, defaults, document, adoptedCustomPaths);
+            ConfigFile config = new ConfigFile(file, cache, codec, defaults, document, adoptedCustomPaths, normalizedPolicy);
             config.update();
             return config;
         } catch (ConfigParseException exception) {
@@ -69,6 +78,10 @@ public class Configs {
 
 
     public static ConfigFile load(Path file, InputStream defaultInput, ConfigFormat format) {
+        return load(file, defaultInput, format, ConfigUpdatePolicy.MERGE_DEFAULTS);
+    }
+
+    public static ConfigFile load(Path file, InputStream defaultInput, ConfigFormat format, ConfigUpdatePolicy updatePolicy) {
         if (file == null) {
             throw new IllegalArgumentException("file cannot be null");
         }
@@ -82,7 +95,7 @@ public class Configs {
             } finally {
                 defaultInput.close();
             }
-            return loadFile(file, defaultText, format);
+            return loadFile(file, defaultText, format, updatePolicy);
         } catch (ConfigParseException exception) {
             throw withSource(exception, file);
         } catch (IOException exception) {
@@ -96,7 +109,7 @@ public class Configs {
         }
         try {
             String text = Files.exists(file) ? new String(Files.readAllBytes(file), StandardCharsets.UTF_8) : "";
-            return loadFile(file, text, format);
+            return loadFile(file, text, format, ConfigUpdatePolicy.MERGE_DEFAULTS);
         } catch (ConfigParseException exception) {
             throw withSource(exception, file);
         } catch (IOException exception) {
@@ -104,21 +117,30 @@ public class Configs {
         }
     }
 
-    private static ConfigFile loadFile(Path file, String defaultText, ConfigFormat format) throws IOException {
+    public static ConfigFile loadCopyOnly(Path dataFolder, ClassLoader classLoader, String resourceName, ConfigFormat format) {
+        return load(dataFolder, classLoader, resourceName, format, ConfigUpdatePolicy.COPY_DEFAULTS_ONLY);
+    }
+
+    public static ConfigFile loadCopyOnly(Path file, InputStream defaultInput, ConfigFormat format) {
+        return load(file, defaultInput, format, ConfigUpdatePolicy.COPY_DEFAULTS_ONLY);
+    }
+
+    private static ConfigFile loadFile(Path file, String defaultText, ConfigFormat format, ConfigUpdatePolicy updatePolicy) throws IOException {
         ConfigCodec codec = ConfigCodecs.of(format);
         Path dataFolder = file.getParent() == null ? java.nio.file.Paths.get("") : file.getParent();
         Path cache = dataFolder.resolve(".bluefoundation").resolve("config-cache").resolve(safeCacheName(file.getFileName().toString()));
         ConfigDocument defaults = codec.read(defaultText);
         boolean existedBeforeLoad = Files.exists(file);
         boolean cacheExistedBeforeLoad = Files.exists(cache);
+        ConfigUpdatePolicy normalizedPolicy = normalizeUpdatePolicy(updatePolicy);
         if (!existedBeforeLoad) {
             ConfigIO.writeAtomic(file, codec.write(defaults));
         }
         ConfigDocument document = codec.read(ConfigIO.read(file));
-        Set<String> adoptedCustomPaths = existedBeforeLoad && !cacheExistedBeforeLoad
+        Set<String> adoptedCustomPaths = normalizedPolicy == ConfigUpdatePolicy.MERGE_DEFAULTS && existedBeforeLoad && !cacheExistedBeforeLoad
                 ? changedExistingPaths(document, defaults)
                 : new HashSet<String>();
-        ConfigFile config = new ConfigFile(file, cache, codec, defaults, document, adoptedCustomPaths);
+        ConfigFile config = new ConfigFile(file, cache, codec, defaults, document, adoptedCustomPaths, normalizedPolicy);
         config.update();
         return config;
     }
@@ -198,6 +220,10 @@ public class Configs {
 
     private static String safeCacheName(String resourceName) {
         return resourceName.replace('\\', '_').replace('/', '_') + ".cache";
+    }
+
+    private static ConfigUpdatePolicy normalizeUpdatePolicy(ConfigUpdatePolicy updatePolicy) {
+        return updatePolicy == null ? ConfigUpdatePolicy.MERGE_DEFAULTS : updatePolicy;
     }
 
     private static boolean isBlank(String value) {
