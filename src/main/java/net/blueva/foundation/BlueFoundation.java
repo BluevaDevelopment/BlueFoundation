@@ -112,6 +112,11 @@ public final class BlueFoundation {
         }
     }
 
+    public static class Players extends net.blueva.foundation.players.Players {
+        private Players() {
+        }
+    }
+
     public static class Scoreboards {
         private Scoreboards() {
         }
