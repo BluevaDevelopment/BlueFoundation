@@ -2,6 +2,7 @@ package net.blueva.foundation.npc;
 
 import org.bukkit.Location;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
 import java.util.UUID;
@@ -103,6 +104,21 @@ public class NPCs {
         npc.name(name);
         NpcRegistry.register(npc);
         return npc;
+    }
+
+    /**
+     * Sends a vanilla entity animation packet (arm swing, damage, ...) to a
+     * single viewer on any server version. The animation ids match the vanilla
+     * protocol ({@code 0} = swing main arm, {@code 3} = swing off-hand).
+     * <p>This is the low-level bridge used by {@code Players} to animate any
+     * entity on legacy servers that lack the Bukkit swing methods.</p>
+     *
+     * @param viewer       the player that should see the animation
+     * @param entityHandle the NMS handle of the entity to animate
+     * @param animationId  the vanilla animation id
+     */
+    public static void sendEntityAnimation(Player viewer, Object entityHandle, int animationId) {
+        NpcPackets.sendAnimation(viewer, entityHandle, animationId);
     }
 
     private static String internalName(UUID uuid, String name) {
