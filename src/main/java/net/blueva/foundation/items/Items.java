@@ -1,5 +1,6 @@
 package net.blueva.foundation.items;
 
+import net.blueva.foundation.materials.LegacyMaterials;
 import net.blueva.foundation.materials.Materials;
 import net.blueva.foundation.text.Text;
 import org.bukkit.Bukkit;
@@ -10,6 +11,7 @@ import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.inventory.meta.SkullMeta;
@@ -56,6 +58,20 @@ public class Items {
         return builder(materialNames).build();
     }
 
+    /**
+     * Creates an {@link ItemStack} from a modern material name that stays valid
+     * on any server version. On 1.13+ the modern material is used; on legacy
+     * servers the name is translated to the legacy material plus its data value
+     * (coloured wool/glass/clay/dye and renamed items).
+     */
+    public static ItemStack ofNamed(String name) {
+        return ofNamed(name, 1);
+    }
+
+    public static ItemStack ofNamed(String name, int amount) {
+        return LegacyMaterials.resolve(name, amount);
+    }
+
     public static ItemStack clone(ItemStack item) {
         return item == null ? null : item.clone();
     }
@@ -72,6 +88,59 @@ public class Items {
             item.setDurability(durability);
         }
         return item;
+    }
+
+    // ------------------------------------------------------------------
+    // Multi-version player inventory hands
+    // ------------------------------------------------------------------
+
+    /**
+     * Returns the item in the player's main hand. Uses {@code getItemInMainHand}
+     * on 1.9+ servers and falls back to {@code getItemInHand} on 1.8.x.
+     */
+    public static ItemStack mainHandItem(PlayerInventory inventory) {
+        if (inventory == null) {
+            return null;
+        }
+        if (HandAccess.MAIN_GET != null) {
+            return (ItemStack) HandAccess.invoke(HandAccess.MAIN_GET, inventory);
+        }
+        return inventory.getItemInHand();
+    }
+
+    /** Sets the item in the player's main hand across all supported versions. */
+    public static PlayerInventory mainHandItem(PlayerInventory inventory, ItemStack item) {
+        if (inventory == null) {
+            return null;
+        }
+        if (HandAccess.MAIN_SET != null) {
+            HandAccess.invoke(HandAccess.MAIN_SET, inventory, item);
+        } else {
+            inventory.setItemInHand(item);
+        }
+        return inventory;
+    }
+
+    /**
+     * Returns the item in the player's off hand, or {@code null} on servers
+     * without an off hand (1.8.x).
+     */
+    public static ItemStack offHandItem(PlayerInventory inventory) {
+        if (inventory == null || HandAccess.OFF_GET == null) {
+            return null;
+        }
+        return (ItemStack) HandAccess.invoke(HandAccess.OFF_GET, inventory);
+    }
+
+    /** Sets the off-hand item where supported; no-op on 1.8.x servers. */
+    public static PlayerInventory offHandItem(PlayerInventory inventory, ItemStack item) {
+        if (inventory == null) {
+            return null;
+        }
+        if (HandAccess.OFF_SET != null) {
+            HandAccess.invoke(HandAccess.OFF_SET, inventory, item);
+        }
+        return inventory;
     }
 
     public static ItemStack name(ItemStack item, String name) {
@@ -1248,6 +1317,32 @@ public class Items {
             this.keyClass = keyClass;
             this.typeClass = typeClass;
             this.containerClass = containerClass;
+        }
+    }
+
+    /** Reflective accessors for main/off-hand methods that only exist on 1.9+. */
+    private static final class HandAccess {
+        private static final Method MAIN_GET = find("getItemInMainHand");
+        private static final Method MAIN_SET = find("setItemInMainHand", ItemStack.class);
+        private static final Method OFF_GET = find("getItemInOffHand");
+        private static final Method OFF_SET = find("setItemInOffHand", ItemStack.class);
+
+        private static Method find(String name, Class<?>... parameterTypes) {
+            try {
+                Method method = PlayerInventory.class.getMethod(name, parameterTypes);
+                method.setAccessible(true);
+                return method;
+            } catch (Throwable ignored) {
+                return null;
+            }
+        }
+
+        private static Object invoke(Method method, Object target, Object... args) {
+            try {
+                return method.invoke(target, args);
+            } catch (Throwable ignored) {
+                return null;
+            }
         }
     }
 
