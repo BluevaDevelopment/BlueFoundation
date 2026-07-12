@@ -117,6 +117,16 @@ public final class BlueFoundation {
         }
     }
 
+    public static class Worlds extends net.blueva.foundation.worlds.Worlds {
+        private Worlds() {
+        }
+    }
+
+    public static class Blocks extends net.blueva.foundation.blocks.Blocks {
+        private Blocks() {
+        }
+    }
+
     public static class Scoreboards {
         private Scoreboards() {
         }
