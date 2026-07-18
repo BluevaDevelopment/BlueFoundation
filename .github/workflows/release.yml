@@ -1,0 +1,68 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Serialize runs so two pushes can't race the build counter.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+          cache: maven
+
+      # Same counter logic as the old build-local.sh: year.build, resetting
+      # the build number when the year changes.
+      - name: Bump version
+        id: version
+        run: |
+          CURRENT_YEAR="$(date +%y)"
+          YEAR="$CURRENT_YEAR"
+          BUILD=0
+          if [[ -f build.properties ]]; then
+            source build.properties
+            YEAR="${year:-$CURRENT_YEAR}"
+            BUILD="${build:-0}"
+          fi
+          if [[ "$YEAR" != "$CURRENT_YEAR" ]]; then
+            YEAR="$CURRENT_YEAR"
+            BUILD=0
+          fi
+          BUILD=$((BUILD + 1))
+          REVISION="$YEAR.$BUILD"
+          printf 'year=%s\nbuild=%s\n' "$YEAR" "$BUILD" > build.properties
+          echo "revision=$REVISION" >> "$GITHUB_OUTPUT"
+          echo "Building BlueFoundation $REVISION"
+
+      - name: Build
+        run: mvn -B -Drevision="${{ steps.version.outputs.revision }}" clean package
+
+      # Pushes made with GITHUB_TOKEN don't retrigger this workflow; the
+      # [skip ci] marker is extra insurance.
+      - name: Commit version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add build.properties
+          git commit -m "build: bump version to ${{ steps.version.outputs.revision }} [skip ci]"
+          git push
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REVISION: ${{ steps.version.outputs.revision }}
+        run: gh release create "v$REVISION" "target/BlueFoundation-$REVISION.jar" --title "BlueFoundation $REVISION" --generate-notes
