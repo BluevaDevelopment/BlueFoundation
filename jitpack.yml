@@ -1,0 +1,8 @@
+# JitPack builds with Java 8 and an old Maven by default. The project needs a
+# modern JDK (it uses String.isBlank, Java 11+) and a recent Maven, matching
+# the GitHub Actions release workflow.
+jdk:
+  - openjdk21
+before_install:
+  - sdk install maven 3.9.11
+  - sdk use maven 3.9.11
