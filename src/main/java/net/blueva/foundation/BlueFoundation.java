@@ -72,6 +72,11 @@ public final class BlueFoundation {
         }
     }
 
+    public static class Entities extends net.blueva.foundation.entities.Entities {
+        private Entities() {
+        }
+    }
+
     public static class Scheduler extends net.blueva.foundation.scheduler.Scheduler {
         private Scheduler() {
         }
