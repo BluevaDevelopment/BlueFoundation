@@ -45,6 +45,12 @@ jobs:
           BUILD=$((BUILD + 1))
           REVISION="$YEAR.$BUILD"
           printf 'year=%s\nbuild=%s\n' "$YEAR" "$BUILD" > build.properties
+          # Keep the pom's default revision in sync: JitPack builds from the
+          # tag with a plain `mvn install` (no -Drevision), so this value is
+          # what BlueFoundation.version() reports for JitPack consumers.
+          sed -i "s|<revision>[^<]*</revision>|<revision>$REVISION</revision>|" pom.xml
+          # Point the README's JitPack dependency snippet at the new tag.
+          sed -i "s|<version>[^<]*</version>|<version>v$REVISION</version>|" README.md
           echo "revision=$REVISION" >> "$GITHUB_OUTPUT"
           echo "Building BlueFoundation $REVISION"
 
@@ -57,7 +63,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add build.properties
+          git add build.properties pom.xml README.md
           git commit -m "build: bump version to ${{ steps.version.outputs.revision }} [skip ci]"
           git push
 
