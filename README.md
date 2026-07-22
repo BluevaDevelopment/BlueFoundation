@@ -22,7 +22,7 @@ import net.blueva.foundation.BlueFoundation;
     <dependency>
         <groupId>com.github.BluevaDevelopment</groupId>
         <artifactId>BlueFoundation</artifactId>
-        <version>VERSION</version>
+        <version>v26.16</version>
     </dependency>
 </dependencies>
 ```
