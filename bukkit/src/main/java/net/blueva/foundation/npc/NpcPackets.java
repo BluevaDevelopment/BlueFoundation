@@ -980,6 +980,15 @@ final class NpcPackets {
         }
     }
 
+    /** Keeps the detached entity handle's own position/rotation fields in sync with the wrapper,
+     * so a spawn packet sent to a viewer who joins later (no teleport/move packet reached them)
+     * still spawns the NPC at its current position rather than where it was created. */
+    static void updateEntityPosition(Object entityHandle, Location location) {
+        if (entityHandle != null && location != null) {
+            updatePosition(entityHandle, location);
+        }
+    }
+
     private static void updatePosition(Object serverPlayer, Location location) {
         try {
             Method setPos = findMethod(serverPlayer.getClass(), "setPos", double.class, double.class, double.class);

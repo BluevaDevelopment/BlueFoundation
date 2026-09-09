@@ -35,6 +35,7 @@ final class HologramPackets {
     private static volatile boolean scaleAccessorFailureLogged = false;
     private static volatile boolean backgroundAccessorFailureLogged = false;
     private static volatile boolean styleFlagsAccessorFailureLogged = false;
+    private static volatile boolean teleportDurationAccessorFailureLogged = false;
 
     private HologramPackets() {
     }
@@ -212,6 +213,31 @@ final class HologramPackets {
         }
     }
 
+    static void setTeleportDuration(Object entityHandle, int ticks) {
+        if (entityHandle == null) {
+            return;
+        }
+        try {
+            Class<?> displayClass = Reflection.nmsClass("Display", "net.minecraft.world.entity.Display");
+            if (displayClass == null) {
+                return;
+            }
+            Object accessor = findTeleportDurationAccessor(displayClass);
+            if (accessor == null) {
+                if (!teleportDurationAccessorFailureLogged) {
+                    teleportDurationAccessorFailureLogged = true;
+                    Logger.getLogger("BlueFoundation").warning("[HologramPackets] could not find the "
+                            + "DATA_TELEPORT_DURATION_ID accessor on " + displayClass.getName() + " - a moving "
+                            + "hologram will snap to its new position instead of interpolating.");
+                    logAllStaticFields(displayClass);
+                }
+                return;
+            }
+            setAccessorValue(entityHandle, accessor, Math.max(0, ticks));
+        } catch (Throwable ignored) {
+        }
+    }
+
     static void sendAddEntity(Player viewer, Object entityHandle) {
         if (entityHandle == null || !Version.isAtLeast(1, 19, 4)) {
             return;
@@ -326,6 +352,22 @@ final class HologramPackets {
             return byName;
         }
         return findAccessorByShapeUnambiguous(textDisplayClass, Byte.class, true, "style flags (Byte)");
+    }
+
+    private static Object findTeleportDurationAccessor(Class<?> displayClass) {
+        // "DATA_TELEPORT_DURATION_ID" on 1.20.2+; "DATA_POS_ROT_INTERPOLATION_DURATION_ID" was the
+        // earlier name for the same field.
+        Object byName = findStaticFieldValue(displayClass, "DATA_TELEPORT_DURATION_ID");
+        if (byName == null) {
+            byName = findStaticFieldValue(displayClass, "DATA_POS_ROT_INTERPOLATION_DURATION_ID");
+        }
+        if (byName != null && isEntityDataAccessor(byName)) {
+            return byName;
+        }
+        // Display declares several EntityDataAccessor<Integer> (interpolation duration, start delta,
+        // teleport duration...) so a by-shape lookup is ambiguous - it will return null and the
+        // caller logs once. The by-name path works on modern Paper (mojmap runtime).
+        return findAccessorByShapeUnambiguous(displayClass, Integer.class, true, "teleport duration (Integer)");
     }
 
     /** One-shot diagnostic dump of every declared static field's name and generic type - used
@@ -758,6 +800,14 @@ final class HologramPackets {
         } catch (Throwable ignored) {
         }
         return null;
+    }
+
+    /** Keeps a line's detached entity handle in sync with the anchor even when there are no viewers,
+     * so a viewer joining later spawns the line at the hologram's current position. */
+    static void updateEntityPosition(Object entityHandle, Location location) {
+        if (entityHandle != null && location != null) {
+            updatePosition(entityHandle, location);
+        }
     }
 
     private static void updatePosition(Object entityHandle, Location location) {

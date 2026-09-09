@@ -52,6 +52,12 @@ public interface Hologram {
 
     boolean hasShadow();
 
+    /** Ticks the client spends interpolating to a teleported position instead of snapping. Default
+     * {@code 0}. Set 2-3 when the hologram is moved often (e.g. following a walking NPC) so it glides. */
+    Hologram teleportDuration(int ticks);
+
+    int getTeleportDuration();
+
     /** Destroys the hologram for every current viewer and unregisters it. */
     void destroy();
 }

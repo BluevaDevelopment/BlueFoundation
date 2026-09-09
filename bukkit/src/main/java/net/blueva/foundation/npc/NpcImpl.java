@@ -108,6 +108,7 @@ final class NpcImpl implements Npc {
     @Override
     public void teleport(Location location) {
         setLocation(location);
+        NpcPackets.updateEntityPosition(entityHandle, this.location);
         for (UUID viewerId : viewers) {
             Player viewer = Bukkit.getPlayer(viewerId);
             if (viewer != null && viewer.isOnline()) {
