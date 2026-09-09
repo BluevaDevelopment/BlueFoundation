@@ -25,6 +25,7 @@ final class HologramImpl implements Hologram {
     private float scale = 1.0f;
     private Integer background;
     private byte styleFlags = 0;
+    private int teleportDuration = 0;
 
     HologramImpl(Location anchor, List<String> lines) {
         this.anchor = anchor.clone();
@@ -83,6 +84,7 @@ final class HologramImpl implements Hologram {
         List<HologramLine> current = this.hologramLines;
         for (int i = 0; i < current.size(); i++) {
             Location lineLocation = lineLocation(i);
+            HologramPackets.updateEntityPosition(current.get(i).entityHandle, lineLocation);
             for (UUID viewerId : viewers) {
                 Player viewer = Bukkit.getPlayer(viewerId);
                 if (viewer != null && viewer.isOnline()) {
@@ -166,6 +168,21 @@ final class HologramImpl implements Hologram {
         return (styleFlags & SHADOW_BIT) == SHADOW_BIT;
     }
 
+    @Override
+    public synchronized Hologram teleportDuration(int ticks) {
+        this.teleportDuration = Math.max(0, ticks);
+        for (HologramLine line : hologramLines) {
+            HologramPackets.setTeleportDuration(line.entityHandle, this.teleportDuration);
+        }
+        pushMetadataToViewers();
+        return this;
+    }
+
+    @Override
+    public int getTeleportDuration() {
+        return teleportDuration;
+    }
+
     private void pushMetadataToViewers() {
         for (UUID viewerId : viewers) {
             Player viewer = Bukkit.getPlayer(viewerId);
@@ -204,6 +221,9 @@ final class HologramImpl implements Hologram {
                 HologramPackets.setBackground(handle, background);
             }
             HologramPackets.setStyleFlags(handle, styleFlags);
+            if (teleportDuration > 0) {
+                HologramPackets.setTeleportDuration(handle, teleportDuration);
+            }
             built.add(new HologramLine(handle, HologramPackets.resolveEntityId(handle), line));
         }
         return built;
