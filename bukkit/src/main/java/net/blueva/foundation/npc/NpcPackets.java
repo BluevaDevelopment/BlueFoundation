@@ -731,7 +731,8 @@ final class NpcPackets {
                 if (!isAssignable(params[1], entityClass)) {
                     continue;
                 }
-                if (!isAssignable(params[2], int.class)) {
+                Object updateInterval = Reflection.serverEntityUpdateInterval(params[2]);
+                if (updateInterval == null) {
                     continue;
                 }
                 if (!isAssignable(params[3], boolean.class)) {
@@ -749,7 +750,7 @@ final class NpcPackets {
                 Object[] args = new Object[params.length];
                 args[0] = level;
                 args[1] = entityHandle;
-                args[2] = 0;
+                args[2] = updateInterval;
                 args[3] = false;
                 args[4] = fifthArg;
                 if (params.length == 6) {

@@ -150,6 +150,21 @@ public class Reflection {
         }
     }
 
+    /**
+     * Returns the value to pass as a {@code ServerEntity} update interval: an {@code int} on older
+     * versions, {@code UpdateInterval.NEVER} on versions that take the interface. Null if neither.
+     */
+    public static Object serverEntityUpdateInterval(Class<?> type) {
+        if (type == int.class || type == Integer.class) {
+            return 0;
+        }
+        try {
+            return type.getField("NEVER").get(null);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
     private static String stripLeadingDot(String value) {
         if (value == null) {
             return "";
