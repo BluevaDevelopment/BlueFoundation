@@ -164,9 +164,11 @@ final class GlowReflectionResolver {
     static Method staticFactory(Class<?> owner, Class<?> returnType, Class<?>... parameters)
             throws NoSuchMethodException {
         for (Method method : allMethods(owner)) {
+            // An enum's valueOf(String) has the same shape as a lookup by serialized name.
             if (Modifier.isStatic(method.getModifiers())
                     && method.getReturnType() == returnType
-                    && Arrays.equals(method.getParameterTypes(), parameters)) {
+                    && Arrays.equals(method.getParameterTypes(), parameters)
+                    && !(owner.isEnum() && method.getName().equals("valueOf"))) {
                 method.setAccessible(true);
                 return method;
             }
