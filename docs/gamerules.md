@@ -26,6 +26,11 @@ BlueFoundation.GameRules.set(world, "SHOW_DEATH_MESSAGES", false);
 That makes migrating existing `GameRule.SHOW_DEATH_MESSAGES` call sites a straight substitution:
 pass the constant's name as a string and the conversion is handled for you.
 
+1.21.11 moved game rules to lowercase registry keys and renamed several of them (`doDaylightCycle`
+became `advance_time`, `doMobSpawning` became `spawn_mobs`, and so on). Legacy names keep working
+there too: they are mapped to the new key when the old one is not found. New keys such as
+`advance_time` are accepted as well.
+
 `set` returns whether the rule was applied and `getBoolean` takes the value to return when the rule
 is missing or unreadable, so a rule that does not exist on the running version degrades quietly
 instead of throwing.

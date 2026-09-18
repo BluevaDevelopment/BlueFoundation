@@ -3,7 +3,9 @@ package net.blueva.foundation.gamerules;
 import org.bukkit.World;
 
 import java.lang.reflect.Method;
+import java.util.LinkedHashSet;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * Multi-version game rule helpers.
@@ -156,16 +158,30 @@ public class GameRules {
     }
 
     /**
-     * Builds the lookup spellings for a rule name. {@code GameRule#getByName} only accepts the
-     * camelCase Minecraft id, so an UPPER_SNAKE name has to be converted before it will match.
+     * Builds the lookup spellings for a rule name, legacy ones first. Before 1.21.11
+     * {@code GameRule#getByName} takes the camelCase id; from 1.21.11 it only takes the
+     * lowercase registry key, and several rules were renamed.
      */
     static String[] nameCandidates(String name) {
         String trimmed = name.trim();
-        if (trimmed.indexOf('_') < 0) {
-            return new String[]{trimmed};
-        }
+        Set<String> candidates = new LinkedHashSet<String>();
+        candidates.add(trimmed);
 
-        String[] parts = trimmed.toLowerCase(Locale.ROOT).split("_");
+        String camel = trimmed.indexOf('_') < 0 ? trimmed : toCamelCase(trimmed);
+        candidates.add(camel);
+
+        String modern = LegacyGameRuleNames.modernKey(camel);
+        if (modern != null) {
+            candidates.add(modern);
+        }
+        if (trimmed.indexOf('_') >= 0) {
+            candidates.add(trimmed.toLowerCase(Locale.ROOT));
+        }
+        return candidates.toArray(new String[0]);
+    }
+
+    private static String toCamelCase(String upperSnake) {
+        String[] parts = upperSnake.toLowerCase(Locale.ROOT).split("_");
         StringBuilder camel = new StringBuilder();
         for (int i = 0; i < parts.length; i++) {
             if (parts[i].isEmpty()) {
@@ -177,7 +193,7 @@ public class GameRules {
                 camel.append(Character.toUpperCase(parts[i].charAt(0))).append(parts[i].substring(1));
             }
         }
-        return new String[]{trimmed, camel.toString()};
+        return camel.toString();
     }
 
     private static void resolve() {
