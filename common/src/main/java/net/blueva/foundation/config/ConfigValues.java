@@ -252,9 +252,11 @@ final class ConfigValues {
                 continue;
             }
             if (current.length() > 0) {
-                current.append(' ');
+                // A line break inside a quoted or flow value folds into one space, indentation included.
+                current.append(' ').append(line.trim());
+            } else {
+                current.append(line);
             }
-            current.append(line);
             balance += bracketBalance(line);
             if (balance < 0 && format != null) {
                 throw new ConfigParseException(format, i + 1, 1, "Unexpected closing bracket");
@@ -326,17 +328,50 @@ final class ConfigValues {
         if (separatorIndex(line, ':') >= 0) {
             return false;
         }
+        // A plain scalar carries on over every following line indented deeper than its key,
+        // which is how other YAML writers wrap a long value.
+        if (leadingSpaces(line) <= leadingSpaces(previous)) {
+            return false;
+        }
+        String previousTrimmed = previous.trim();
         int colon = separatorIndex(previous, ':');
-        if (colon < 0) {
+        String value;
+        if (colon >= 0) {
+            value = previous.substring(colon + 1).trim();
+        } else if (previousTrimmed.startsWith("- ")) {
+            value = previousTrimmed.substring(2).trim();
+        } else {
             return false;
         }
-        String value = previous.substring(colon + 1).trim();
-        if (value.isEmpty() || value.equals("|") || value.equals(">")
-                || value.endsWith("|") || value.endsWith(">")) {
+        if (value.isEmpty() || isBlockScalarHeader(value) || inlineCommentIndex(value) >= 0) {
             return false;
         }
-        return trimmed.startsWith("<") || trimmed.startsWith("&") || trimmed.startsWith("§")
-                || trimmed.startsWith("{") || trimmed.startsWith("[");
+        // Quoted values and flow collections continue through their own delimiters, and a bare
+        // anchor opens a nested block rather than a value.
+        char first = value.charAt(0);
+        return first != '\'' && first != '"' && first != '[' && first != '{'
+                && !(first == '&' && value.indexOf(' ') < 0);
+    }
+
+    private static boolean isBlockScalarHeader(String value) {
+        if (value.isEmpty() || value.charAt(0) != '|' && value.charAt(0) != '>') {
+            return false;
+        }
+        for (int i = 1; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c != '+' && c != '-' && !Character.isDigit(c)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static int leadingSpaces(String line) {
+        int count = 0;
+        while (count < line.length() && line.charAt(count) == ' ') {
+            count++;
+        }
+        return count;
     }
 
     private static boolean hasUnclosedQuoteIgnoringComments(String line) {
