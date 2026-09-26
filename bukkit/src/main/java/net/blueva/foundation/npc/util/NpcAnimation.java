@@ -3,8 +3,8 @@ package net.blueva.foundation.npc.util;
 /**
  * Animations that can be played on a player NPC.
  *
- * <p>Values map to the vanilla entity animation packet ids. Modern versions
- * support all of them; older versions silently ignore unsupported ids.</p>
+ * <p>Ids are the vanilla entity animation packet ids up to 26.2; newer versions map each
+ * animation to its own packet. Older versions silently ignore unsupported ids.</p>
  */
 public enum NpcAnimation {
     SWING_MAIN_ARM(0),

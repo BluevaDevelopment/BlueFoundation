@@ -5,6 +5,7 @@ import net.blueva.foundation.npc.event.NpcDespawnEvent;
 import net.blueva.foundation.npc.event.NpcSpawnEvent;
 import net.blueva.foundation.npc.util.NpcAnimation;
 import net.blueva.foundation.npc.util.NpcPose;
+import net.blueva.foundation.reflection.Reflection;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
@@ -416,10 +417,19 @@ final class NpcImpl implements Npc {
         if (animation == null) {
             return this;
         }
+        boolean modern = NpcAnimationPackets.supported();
+        Object packet = modern ? NpcAnimationPackets.create(entityHandle, animation) : null;
+        if (modern && packet == null) {
+            return this;
+        }
         for (UUID viewerId : viewers) {
             Player viewer = Bukkit.getPlayer(viewerId);
             if (viewer != null && viewer.isOnline()) {
-                NpcPackets.sendAnimation(viewer, entityHandle, animation.getId());
+                if (modern) {
+                    Reflection.sendPacket(viewer, packet);
+                } else {
+                    NpcPackets.sendAnimation(viewer, entityHandle, animation.getId());
+                }
             }
         }
         return this;
