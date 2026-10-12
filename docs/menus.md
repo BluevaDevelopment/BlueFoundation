@@ -59,7 +59,21 @@ button on Bedrock and is ignored on Java; `material` is the item on Java and is 
 A button's lore is folded into the Bedrock button's label - Bedrock buttons wrap on newlines - so
 the explanation a Java player reads in the tooltip is not lost.
 
-### Pagination
+### Dynamic content and pagination
+
+Both `layout: static` and `layout: paginated` accept runtime buttons through
+`MenuContext.entries(...)`. Dynamic content does not imply pagination.
+
+- `static`: one view, no previous/next navigation. A chest fills its available
+  dynamic slots; a form shows all supplied entries. `page-size` does not split
+  the entries and `page:` actions are ignored.
+- `paginated`: divides the entries into pages using `page-size` (or the form
+  page size), with previous/next navigation.
+
+Declared buttons and decoration keep their slots in either layout. Use `static`
+for a dynamically updated control panel or independently scrolling rows, and
+`paginated` for a list the user browses page by page. The legacy layout aliases
+`list`, `grid` and `dynamic` still mean `paginated` for backward compatibility.
 
 Set `layout: paginated` and hand the entries in at open time:
 

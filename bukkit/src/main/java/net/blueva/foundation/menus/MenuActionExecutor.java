@@ -95,6 +95,9 @@ final class MenuActionExecutor {
                 goBack(plugin, player, context);
                 return true;
             case PAGE:
+                if (context == null || context.definition().layout() != MenuLayout.PAGINATED) {
+                    return false;
+                }
                 changePage(plugin, player, value, context);
                 return true;
             case CUSTOM:
@@ -138,7 +141,7 @@ final class MenuActionExecutor {
     }
 
     private static void changePage(Plugin plugin, Player player, String value, MenuContext context) {
-        if (context == null) {
+        if (context == null || context.definition().layout() != MenuLayout.PAGINATED) {
             return;
         }
         Pagination pagination = pagination(context, player);

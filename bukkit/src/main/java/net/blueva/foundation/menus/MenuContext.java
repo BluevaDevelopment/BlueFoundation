@@ -62,12 +62,12 @@ public final class MenuContext {
      * @return this context
      */
     public MenuContext page(int page) {
-        this.page = Math.max(0, page);
+        this.page = definition.layout() == MenuLayout.PAGINATED ? Math.max(0, page) : 0;
         return this;
     }
 
     /**
-     * The entries a paginated menu is paging through.
+     * Runtime entries, drawn in both static and paginated menus.
      *
      * @return the live list, safe to add to before opening
      */
@@ -76,7 +76,7 @@ public final class MenuContext {
     }
 
     /**
-     * @param entries the entries to page through
+     * @param entries the runtime entries to draw
      * @return this context
      */
     public MenuContext entries(Collection<MenuButton> entries) {
@@ -171,6 +171,9 @@ public final class MenuContext {
      * @return the pagination state for this view
      */
     public Pagination pagination(boolean forForm) {
+        if (definition.layout() != MenuLayout.PAGINATED) {
+            return new Pagination(0, Math.max(1, entries.size()), entries.size());
+        }
         return new Pagination(page, definition.pageSize(forForm), entries.size());
     }
 

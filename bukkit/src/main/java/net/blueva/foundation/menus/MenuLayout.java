@@ -3,11 +3,12 @@ package net.blueva.foundation.menus;
 import java.util.Locale;
 
 /**
- * Whether a menu shows a fixed set of buttons or a page of a longer list.
+ * Whether runtime entries occupy one view or are split into pages.
+ * Both layouts accept declared buttons and entries supplied at open time.
  */
 public enum MenuLayout {
 
-    /** Only the buttons declared in the menu. */
+    /** Declared buttons and runtime entries in a single view, without navigation. */
     STATIC,
 
     /**

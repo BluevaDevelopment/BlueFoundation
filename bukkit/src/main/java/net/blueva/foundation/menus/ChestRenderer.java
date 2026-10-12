@@ -132,7 +132,7 @@ final class ChestRenderer {
     private static void drawEntries(Inventory inventory, MenuHolder holder, MenuContext context,
                                     Pagination pagination, Set<Integer> taken) {
         MenuDefinition definition = context.definition();
-        if (definition.layout() != MenuLayout.PAGINATED || context.entries().isEmpty()) {
+        if (context.entries().isEmpty()) {
             return;
         }
         List<Integer> slots = availableSlots(inventory.getSize(), definition, taken);

@@ -52,7 +52,7 @@ final class FormRenderer {
      * The buttons this form shows, in order: declared buttons, this page's
      * entries, then navigation.
      */
-    private static List<MenuButton> visibleButtons(MenuContext context, Pagination pagination) {
+    static List<MenuButton> visibleButtons(MenuContext context, Pagination pagination) {
         List<MenuButton> visible = new ArrayList<MenuButton>();
         MenuDefinition definition = context.definition();
         Player player = context.player();
@@ -63,14 +63,14 @@ final class FormRenderer {
             }
         }
 
-        if (definition.layout() == MenuLayout.PAGINATED) {
-            List<MenuButton> entries = context.entries();
-            for (int i = pagination.start(); i < pagination.end(); i++) {
-                MenuButton entry = entries.get(i);
-                if (entry != null && ChestRenderer.visible(player, context, pagination, entry)) {
-                    visible.add(entry);
-                }
+        List<MenuButton> entries = context.entries();
+        for (int i = pagination.start(); i < pagination.end(); i++) {
+            MenuButton entry = entries.get(i);
+            if (entry != null && ChestRenderer.visible(player, context, pagination, entry)) {
+                visible.add(entry);
             }
+        }
+        if (definition.layout() == MenuLayout.PAGINATED) {
             if (pagination.hasPrevious() && definition.previousButton() != null) {
                 visible.add(definition.previousButton());
             }
