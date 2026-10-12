@@ -188,6 +188,10 @@ final class YamlConfigCodec implements ConfigCodec {
             appendInline(builder, node);
             builder.append('\n');
             writeChildren(builder, node, indent + 2);
+        } else if (node.getValue() instanceof List && castList(node.getValue()).isEmpty()) {
+            builder.append(" []");
+            appendInline(builder, node);
+            builder.append('\n');
         } else if (node.getValue() instanceof List) {
             appendInline(builder, node);
             builder.append('\n');

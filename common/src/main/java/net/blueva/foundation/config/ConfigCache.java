@@ -25,7 +25,7 @@ final class ConfigCache {
         entries.put(path, new Entry(
                 "adopted-custom:" + localHash,
                 localHash,
-                commentHash(localNode),
+                commentHash(defaultNode),
                 commentHash(localNode)
         ));
     }

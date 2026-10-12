@@ -307,8 +307,10 @@ public class ConfigFile {
             if (cached != null) {
                 String localHash = ConfigCache.hash(localNode.getValue());
                 if (localHash.equals(cached.defaultHash)) {
-                    copyValueAndComments(localNode, defaultNode);
-                } else if (ConfigCache.commentHash(localNode).equals(cached.defaultCommentHash)) {
+                    localNode.setValue(defaultNode.getValue());
+                }
+                // Values and comments can be customized independently.
+                if (ConfigCache.commentHash(localNode).equals(cached.defaultCommentHash)) {
                     copyComments(localNode, defaultNode);
                 } else {
                     refreshMissingComments(localNode, defaultNode);
