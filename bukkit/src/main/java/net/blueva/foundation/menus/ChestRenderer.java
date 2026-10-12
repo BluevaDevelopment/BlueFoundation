@@ -211,6 +211,8 @@ final class ChestRenderer {
      * @return the item, or {@code null} if the button has no usable material
      */
     static ItemStack item(Player player, MenuContext context, Pagination pagination, MenuButton button) {
+        ItemStack exact = button.item();
+        if (exact != null) return exact;
         Material material = material(button);
         if (material == null) {
             return null;

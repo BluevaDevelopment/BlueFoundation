@@ -1,6 +1,7 @@
 package net.blueva.foundation.menus;
 
 import org.bukkit.entity.Player;
+import org.bukkit.event.inventory.InventoryClickEvent;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -23,6 +24,7 @@ public final class MenuContext {
     private final List<MenuButton> entries = new ArrayList<MenuButton>();
     private final Map<String, String> placeholders = new LinkedHashMap<String, String>();
     private final Map<String, Object> data = new LinkedHashMap<String, Object>();
+    private InventoryClickEvent clickEvent;
     private int page;
     private String backMenu;
     private int backPage;
@@ -39,6 +41,10 @@ public final class MenuContext {
     /**
      * @return who the menu is being drawn for
      */
+    /** The current Java click, available only during synchronous action dispatch. */
+    public InventoryClickEvent clickEvent() { return clickEvent; }
+    void clickEvent(InventoryClickEvent event) { clickEvent = event; }
+
     public Player player() {
         return player;
     }

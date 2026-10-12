@@ -345,3 +345,14 @@ public void onDisable() {
     BlueFoundation.Dialogs.release(this);
 }
 ```
+
+### Exact Java items and click events
+
+Runtime buttons may set `MenuButton.builder(id).item(stack)`: the chest renderer
+uses an isolated clone of the full stack, retaining PDC, equipment attributes and
+other metadata. Labels/lore/material fields still describe its Bedrock form;
+the supplied item is already rendered and is not re-formatted on Java.
+
+`context.clickEvent()` supplies the real Java inventory click only during
+synchronous action dispatch (including button handlers). It is cleared in a
+`finally` block and is null for Bedrock forms. Do not retain it for async work.

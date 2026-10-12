@@ -60,10 +60,14 @@ final class MenuListener implements Listener {
         if (clickSound != null) {
             Sounds.play(player, 1f, 1f, clickSound);
         }
-        if (button.handler() != null) {
-            button.handler().accept(player);
+        InventoryClickEvent previous = context.clickEvent();
+        context.clickEvent(event);
+        try {
+            if (button.handler() != null) button.handler().accept(player);
+            MenuActionExecutor.run(plugin, player, button.actions(), event.getClick(), context);
+        } finally {
+            context.clickEvent(previous);
         }
-        MenuActionExecutor.run(plugin, player, button.actions(), event.getClick(), context);
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)

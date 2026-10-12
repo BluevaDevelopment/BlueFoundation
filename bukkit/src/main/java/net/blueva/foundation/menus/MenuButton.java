@@ -1,6 +1,7 @@
 package net.blueva.foundation.menus;
 
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -21,6 +22,7 @@ import java.util.function.Function;
  */
 public final class MenuButton {
 
+    private final ItemStack item;
     private final String id;
     private final String name;
     private final List<String> lore;
@@ -38,6 +40,7 @@ public final class MenuButton {
     private final Consumer<Player> handler;
 
     private MenuButton(Builder builder) {
+        this.item = builder.item == null ? null : builder.item.clone();
         this.id = builder.id;
         this.name = builder.name;
         this.lore = Collections.unmodifiableList(new ArrayList<String>(builder.lore));
@@ -66,6 +69,9 @@ public final class MenuButton {
     /**
      * @return the button's key within its menu
      */
+    /** Exact Java item blueprint, including PDC and all component metadata. */
+    public ItemStack item() { return item == null ? null : item.clone(); }
+
     public String id() {
         return id;
     }
@@ -238,6 +244,7 @@ public final class MenuButton {
 
     /** Builds a {@link MenuButton}. */
     public static final class Builder {
+        private ItemStack item;
         private final String id;
         private String name = "";
         private final List<String> lore = new ArrayList<String>();
@@ -262,6 +269,9 @@ public final class MenuButton {
          * @param name the display name, in MiniMessage
          * @return this builder
          */
+        /** Cloned on input and output; renderers never mutate the caller's item. */
+        public Builder item(ItemStack item) { this.item = item == null ? null : item.clone(); return this; }
+
         public Builder name(String name) {
             this.name = name == null ? "" : name;
             return this;
