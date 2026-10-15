@@ -275,7 +275,7 @@ public class Dependencies {
             long ucpOffset = ((Number) objectFieldOffset.invoke(unsafe, ucpField)).longValue();
             Object ucp = getObject.invoke(unsafe, classLoader, ucpOffset);
 
-            Field pathField = ucp.getClass().getDeclaredField("path");
+            Field pathField = findUrlListField(ucp.getClass());
             long pathOffset = ((Number) objectFieldOffset.invoke(unsafe, pathField)).longValue();
             List<URL> path = (List<URL>) getObject.invoke(unsafe, ucp, pathOffset);
             if (path == null) {
@@ -300,6 +300,15 @@ public class Dependencies {
                     }
                 } catch (NoSuchFieldException ignored) {
                 }
+            }
+        }
+
+        // JDK 27 renamed URLClassPath.path to searchPath.
+        private static Field findUrlListField(Class<?> ucpClass) throws NoSuchFieldException {
+            try {
+                return ucpClass.getDeclaredField("path");
+            } catch (NoSuchFieldException ignored) {
+                return ucpClass.getDeclaredField("searchPath");
             }
         }
     }
